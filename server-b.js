@@ -22,9 +22,8 @@ app.use((req, res, next) => {
 
 app.get("/", (req, res) => res.send("SNES Puppeteer streaming server OK"));
 
-// Serve debug screenshots
 app.get("/debug-screenshot.jpg", (req, res) => {
-  const p = "/tmp/debug-screenshot.jpg";
+  var p = "/tmp/debug-screenshot.jpg";
   if (fs.existsSync(p)) {
     res.setHeader("Content-Type", "image/jpeg");
     res.sendFile(p);
@@ -54,21 +53,19 @@ async function createSession(ws, romId, wallet) {
   console.log("[session] creating: rom=" + romId + " wallet=" + wallet);
 
   const browser = await puppeteer.launch({
-    headless: "new",
+    headless: false,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--use-gl=egl",
       "--enable-webgl",
       "--enable-webgl2",
       "--ignore-gpu-blocklist",
       "--ignore-gpu-blacklist",
-      "--disable-gpu-driver-bug-workarounds",
       "--autoplay-policy=no-user-gesture-required",
-      "--enable-features=SharedArrayBuffer"
+      "--enable-features=SharedArrayBuffer",
+      "--display=:99"
     ]
   });
 
@@ -99,10 +96,11 @@ async function createSession(ws, romId, wallet) {
     req.continue();
   });
 
-  // Only log errors and important messages — suppress translation noise
+  // Suppress translation noise, only log meaningful messages
   page.on("console", function(msg) {
     var text = msg.text();
     if (text.includes("Translation not found")) return;
+    if (text.includes("Language set to")) return;
     console.log("[browser] " + msg.type() + ": " + text);
   });
   page.on("pageerror", function(err) {
@@ -118,6 +116,15 @@ async function createSession(ws, romId, wallet) {
 
   await page.goto(gameUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
 
+  // Check WebGL status immediately after page load
+  var webglStatus = await page.evaluate(function() {
+    var canvas = document.createElement("canvas");
+    var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) return "WebGL NOT available";
+    return "WebGL OK: " + gl.getParameter(gl.VERSION);
+  });
+  console.log("[session] WebGL check: " + webglStatus);
+
   var keepalive = setInterval(function() {
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({ type: "status", message: "Loading emulator..." }));
@@ -131,19 +138,17 @@ async function createSession(ws, romId, wallet) {
     console.log("[session] canvas found - emulator loaded");
   } catch (e) {
     console.warn("[session] canvas not found within 60s - taking diagnostic screenshot");
-    // Save screenshot so we can see what the page looks like
     try {
       await page.screenshot({ path: "/tmp/debug-screenshot.jpg", type: "jpeg", quality: 80 });
-      console.log("[session] diagnostic screenshot saved - visit /debug-screenshot.jpg on this server");
+      console.log("[session] screenshot saved - visit /debug-screenshot.jpg");
     } catch (se) {
       console.warn("[session] screenshot failed: " + se.message);
     }
-    // Also log what elements exist on the page
     var elements = await page.evaluate(function() {
       return {
         hasCanvas: document.querySelectorAll("canvas").length,
         hasGame: document.getElementById("game") !== null,
-        bodyText: document.body.innerText.substring(0, 500),
+        bodyText: document.body.innerText.substring(0, 300),
         iframes: document.querySelectorAll("iframe").length
       };
     });
