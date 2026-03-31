@@ -1,0 +1,221 @@
+<m-group>
+
+  <!-- Cabinet Body -->
+  <m-cube width="1.2" height="2.2" depth="0.8" y="1.1" color="#1a1a2e"></m-cube>
+
+  <!-- Screen Bezel -->
+  <m-cube width="1.0" height="0.85" depth="0.05" y="1.75" z="0.43" color="#0f0f0f"></m-cube>
+
+  <!-- Screen — src replaced every frame with base64 PNG from server -->
+  <m-image
+    id="screen"
+    src="https://jdunk4.github.io/Gamer/SMW%20-%20Kaizo%20Mario%20World%201.png"
+    width="0.88" height="0.72"
+    y="1.75" z="0.46">
+  </m-image>
+
+  <!-- Marquee Box -->
+  <m-cube width="1.1" height="0.35" depth="0.3" y="2.4" z="0.25" color="#e8000d"></m-cube>
+  <m-label content="KAIZO MARIO WORLD" y="2.47" z="0.42" width="1.0" height="0.16" font-size="18" color="#ffffff" alignment="center"></m-label>
+  <m-label content="T. Takemoto | Expert | 4.5★" y="2.3" z="0.42" width="1.0" height="0.1" font-size="12" color="#ffcc00" alignment="center"></m-label>
+
+  <!-- Marquee Light Strips -->
+  <m-cube width="1.15" height="0.03" depth="0.1" y="2.62" z="0.3" color="#ffcc00"></m-cube>
+  <m-cube width="1.15" height="0.03" depth="0.1" y="2.22" z="0.3" color="#ffcc00"></m-cube>
+
+  <!-- Side Panels -->
+  <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="-0.625" color="#111133"></m-cube>
+  <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="0.625" color="#111133"></m-cube>
+
+  <!-- Control Panel -->
+  <m-cube width="1.1" height="0.15" depth="0.5" y="0.95" z="0.15" rx="-20" color="#111122"></m-cube>
+
+  <!-- Joystick -->
+  <m-cylinder radius="0.05" height="0.02" y="1.06" z="0.1" x="-0.2" color="#222233"></m-cylinder>
+  <m-sphere radius="0.06" y="1.1" z="0.1" x="-0.2" color="#cc0000"></m-sphere>
+
+  <!-- Buttons -->
+  <m-sphere radius="0.045" y="1.07" z="0.05" x="0.1" color="#e8000d"></m-sphere>
+  <m-sphere radius="0.045" y="1.07" z="0.05" x="0.22" color="#ffcc00"></m-sphere>
+  <m-sphere radius="0.045" y="1.07" z="0.05" x="0.34" color="#0044ff"></m-sphere>
+  <m-sphere radius="0.045" y="1.07" z="-0.05" x="0.22" color="#00aa44"></m-sphere>
+
+  <!-- Coin Slot -->
+  <m-cube width="0.1" height="0.02" depth="0.02" y="1.45" z="0.42" color="#333344"></m-cube>
+
+  <!-- Speaker Grilles -->
+  <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="-0.3" color="#0a0a1a"></m-cube>
+  <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="0.3" color="#0a0a1a"></m-cube>
+
+  <!-- Audio -->
+  <m-audio id="audio" enabled="false" sx="0.1" sy="0.1" sz="0.1" y="1.75"></m-audio>
+
+  <!-- Floor Base -->
+  <m-cube width="1.3" height="0.08" depth="0.9" y="0.04" color="#0d0d1f"></m-cube>
+
+  <!-- Difficulty Label -->
+  <m-label content="⚠ EXPERT | KAIZO" y="0.65" z="0.42" width="0.9" height="0.1" font-size="11" color="#ff4400" alignment="center"></m-label>
+
+  <!-- Completion Counter -->
+  <m-label id="completion-label" content="0 players completed" y="0.52" z="0.42" width="0.9" height="0.1" font-size="10" color="#aaaaff" alignment="center"></m-label>
+
+  <!-- Info Card -->
+  <m-image
+    id="info-card"
+    src="https://jdunk4.github.io/Gamer/KMW1%20-%20Info%20Card.png"
+    width="1.4" height="1.0"
+    y="3.6" z="0.1"
+    visible="false">
+  </m-image>
+
+  <!-- Position Probe -->
+  <m-position-probe range="3.0" id="probe"></m-position-probe>
+
+  <!-- Interaction — defined BEFORE script so getElementById finds it -->
+  <m-interaction id="play-btn" prompt="Press E to Play Kaizo Mario World" range="2.5"></m-interaction>
+
+  <script>
+    const SNES_SERVER_WS = "wss://snes-server-production.up.railway.app/tunnel";
+    const BACKEND_SERVER = "https://gamer-production.up.railway.app";
+    const ROM_ID = "kaizo-mario-world-1";
+
+    // Wallet from URL param (same pattern as game.html in Path A)
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : ""
+    );
+    const WALLET = params.get("wallet") || "anonymous";
+
+    const screen   = document.getElementById("screen");
+    const audio    = document.getElementById("audio");
+    const probe    = document.getElementById("probe");
+    const card     = document.getElementById("info-card");
+    const compLabel = document.getElementById("completion-label");
+    const playBtn  = document.getElementById("play-btn");
+
+    let socket = null;
+    let gameActive = false;
+
+    // ── Interaction — correct MML event name is "interact" ────────────────
+    playBtn.addEventListener("interact", function() {
+      if (gameActive) {
+        closeGame();
+      } else {
+        launchGame();
+      }
+    });
+
+    // ── Proximity ─────────────────────────────────────────────────────────
+    probe.addEventListener("positionenter", function() {
+      card.setAttribute("visible", "true");
+    });
+    probe.addEventListener("positionleave", function() {
+      card.setAttribute("visible", "false");
+      if (gameActive) closeGame();
+    });
+
+    // ── WebSocket stream ──────────────────────────────────────────────────
+    function connectToSNESServer() {
+      socket = new WebSocket(
+        SNES_SERVER_WS + "?rom=" + ROM_ID + "&wallet=" + WALLET
+      );
+
+      socket.onopen = function() {
+        console.log("SNES stream connected");
+        gameActive = true;
+        playBtn.setAttribute("prompt", "Press E to Close Game");
+      };
+
+      socket.onmessage = function(msg) {
+        var frame = JSON.parse(msg.data);
+
+        if (frame.image) {
+          screen.setAttribute("src", frame.image);
+        }
+        if (frame.audio) {
+          audio.setAttribute("src", frame.audio);
+          audio.setAttribute("enabled", "true");
+          audio.setAttribute("start-time", document.timeline ? document.timeline.currentTime : 0);
+        }
+        if (frame.type === "completion") {
+          logCompletion();
+        }
+      };
+
+      socket.onclose = function() {
+        console.log("SNES stream closed");
+        gameActive = false;
+        screen.setAttribute("src", "https://jdunk4.github.io/Gamer/SMW%20-%20Kaizo%20Mario%20World%201.png");
+        audio.setAttribute("enabled", "false");
+        playBtn.setAttribute("prompt", "Press E to Play Kaizo Mario World");
+      };
+
+      socket.onerror = function(e) {
+        console.error("Stream error:", e);
+        socket.close();
+      };
+    }
+
+    function launchGame() {
+      if (socket && socket.readyState === WebSocket.OPEN) return;
+      connectToSNESServer();
+    }
+
+    function closeGame() {
+      if (socket) socket.close();
+    }
+
+    // ── Keyboard input → server ───────────────────────────────────────────
+    document.addEventListener("keydown", function(e) {
+      if (!gameActive) return;
+      var map = {
+        ArrowUp: "up", ArrowDown: "down",
+        ArrowLeft: "left", ArrowRight: "right",
+        z: "a", x: "b", a: "x", s: "y",
+        Enter: "start", Shift: "select"
+      };
+      var btn = map[e.key];
+      if (!btn) return;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "keyDown", key: btn }));
+      }
+    });
+
+    document.addEventListener("keyup", function(e) {
+      if (!gameActive) return;
+      var map = {
+        ArrowUp: "up", ArrowDown: "down",
+        ArrowLeft: "left", ArrowRight: "right",
+        z: "a", x: "b", a: "x", s: "y",
+        Enter: "start", Shift: "select"
+      };
+      var btn = map[e.key];
+      if (!btn) return;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "keyUp", key: btn }));
+      }
+    });
+
+    // ── Completion ────────────────────────────────────────────────────────
+    function logCompletion() {
+      fetch(BACKEND_SERVER + "/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: WALLET, rom: ROM_ID })
+      }).then(function() { refreshCompletionCount(); }).catch(function() {});
+    }
+
+    function refreshCompletionCount() {
+      fetch(BACKEND_SERVER + "/completions/" + ROM_ID)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var count = data.count || 0;
+          compLabel.setAttribute("content",
+            count + " player" + (count !== 1 ? "s" : "") + " completed"
+          );
+        }).catch(function() {});
+    }
+
+    refreshCompletionCount();
+  </script>
+
+</m-group>
