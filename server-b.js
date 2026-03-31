@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const puppeteer = require("puppeteer");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +21,17 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => res.send("SNES Puppeteer streaming server OK"));
+
+// Serve debug screenshots
+app.get("/debug-screenshot.jpg", (req, res) => {
+  const p = "/tmp/debug-screenshot.jpg";
+  if (fs.existsSync(p)) {
+    res.setHeader("Content-Type", "image/jpeg");
+    res.sendFile(p);
+  } else {
+    res.status(404).send("No screenshot yet");
+  }
+});
 
 const KEY_MAP = {
   up: "ArrowUp",
@@ -63,7 +75,6 @@ async function createSession(ws, romId, wallet) {
   const page = await browser.newPage();
   await page.setViewport({ width: VIEWPORT_W, height: VIEWPORT_H });
 
-  // Polyfill crossOriginIsolated and SharedArrayBuffer before page scripts run
   await page.evaluateOnNewDocument(function() {
     Object.defineProperty(window, "crossOriginIsolated", {
       get: function() { return true; }
@@ -73,33 +84,26 @@ async function createSession(ws, romId, wallet) {
     }
   });
 
-  // Intercept ALL requests from cdn.emulatorjs.org that return JSON
-  // These CORS-block in headless Chrome and abort EmulatorJS boot
   await page.setRequestInterception(true);
-
   page.on("request", function(req) {
     var url = req.url();
-
-    // Mock every JSON file from the EmulatorJS CDN
-    // This covers: localization, core reports, version checks, config files
     if (url.includes("cdn.emulatorjs.org") && url.endsWith(".json")) {
-      console.log("[intercept] mocking: " + url);
       req.respond({
         status: 200,
         contentType: "application/json",
-        headers: {
-          "Access-Control-Allow-Origin": "*"
-        },
+        headers: { "Access-Control-Allow-Origin": "*" },
         body: "{}"
       });
       return;
     }
-
     req.continue();
   });
 
+  // Only log errors and important messages — suppress translation noise
   page.on("console", function(msg) {
-    console.log("[browser] " + msg.type() + ": " + msg.text());
+    var text = msg.text();
+    if (text.includes("Translation not found")) return;
+    console.log("[browser] " + msg.type() + ": " + text);
   });
   page.on("pageerror", function(err) {
     console.error("[browser] PAGE ERROR: " + err.message);
@@ -126,7 +130,24 @@ async function createSession(ws, romId, wallet) {
     canvasFound = true;
     console.log("[session] canvas found - emulator loaded");
   } catch (e) {
-    console.warn("[session] canvas not found within 60s");
+    console.warn("[session] canvas not found within 60s - taking diagnostic screenshot");
+    // Save screenshot so we can see what the page looks like
+    try {
+      await page.screenshot({ path: "/tmp/debug-screenshot.jpg", type: "jpeg", quality: 80 });
+      console.log("[session] diagnostic screenshot saved - visit /debug-screenshot.jpg on this server");
+    } catch (se) {
+      console.warn("[session] screenshot failed: " + se.message);
+    }
+    // Also log what elements exist on the page
+    var elements = await page.evaluate(function() {
+      return {
+        hasCanvas: document.querySelectorAll("canvas").length,
+        hasGame: document.getElementById("game") !== null,
+        bodyText: document.body.innerText.substring(0, 500),
+        iframes: document.querySelectorAll("iframe").length
+      };
+    });
+    console.log("[session] page state: " + JSON.stringify(elements));
   }
 
   clearInterval(keepalive);
@@ -150,11 +171,9 @@ async function createSession(ws, romId, wallet) {
       clearInterval(frameInterval);
       return;
     }
-
     try {
       var canvasEl = await page.$("canvas");
       var imageBase64;
-
       if (canvasEl) {
         imageBase64 = await canvasEl.screenshot({
           type: "jpeg",
@@ -168,12 +187,10 @@ async function createSession(ws, romId, wallet) {
           encoding: "base64"
         });
       }
-
       var dataUri = "data:image/jpeg;base64," + imageBase64;
       ws.send(JSON.stringify({ image: dataUri }), function(err) {
         if (err) console.warn("[session] send error: " + err.message);
       });
-
     } catch (e) {
       console.error("[session] screenshot failed: " + e.message);
       clearInterval(frameInterval);
@@ -205,7 +222,6 @@ wss.on("connection", async function(ws, req) {
   var wallet = url.searchParams.get("wallet") || "anonymous";
 
   console.log("[ws] connected: rom=" + romId + " wallet=" + wallet);
-
   ws.send(JSON.stringify({ type: "status", message: "Launching emulator..." }));
 
   try {
