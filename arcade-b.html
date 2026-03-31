@@ -1,7 +1,7 @@
 <m-group>
 
-  <!-- Cabinet Body -->
-  <m-cube width="1.2" height="2.2" depth="0.8" y="1.1" color="#1a1a2e"></m-cube>
+  <!-- Cabinet Body — deep red -->
+  <m-cube width="1.2" height="2.2" depth="0.8" y="1.1" color="#2a0a0a"></m-cube>
 
   <!-- Screen Bezel -->
   <m-cube width="1.0" height="0.85" depth="0.05" y="1.75" z="0.43" color="#0f0f0f"></m-cube>
@@ -23,15 +23,15 @@
   <m-cube width="1.15" height="0.03" depth="0.1" y="2.62" z="0.3" color="#ffcc00"></m-cube>
   <m-cube width="1.15" height="0.03" depth="0.1" y="2.22" z="0.3" color="#ffcc00"></m-cube>
 
-  <!-- Side Panels -->
-  <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="-0.625" color="#111133"></m-cube>
-  <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="0.625" color="#111133"></m-cube>
+  <!-- Side Panels — dark red -->
+  <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="-0.625" color="#1a0505"></m-cube>
+  <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="0.625" color="#1a0505"></m-cube>
 
-  <!-- Control Panel -->
-  <m-cube width="1.1" height="0.15" depth="0.5" y="0.95" z="0.15" rx="-20" color="#111122"></m-cube>
+  <!-- Control Panel — dark red -->
+  <m-cube width="1.1" height="0.15" depth="0.5" y="0.95" z="0.15" rx="-20" color="#200808"></m-cube>
 
   <!-- Joystick -->
-  <m-cylinder radius="0.05" height="0.02" y="1.06" z="0.1" x="-0.2" color="#222233"></m-cylinder>
+  <m-cylinder radius="0.05" height="0.02" y="1.06" z="0.1" x="-0.2" color="#1a0000"></m-cylinder>
   <m-sphere radius="0.06" y="1.1" z="0.1" x="-0.2" color="#cc0000"></m-sphere>
 
   <!-- Buttons -->
@@ -41,14 +41,14 @@
   <m-sphere radius="0.045" y="1.07" z="-0.05" x="0.22" color="#00aa44"></m-sphere>
 
   <!-- Coin Slot -->
-  <m-cube width="0.1" height="0.02" depth="0.02" y="1.45" z="0.42" color="#333344"></m-cube>
+  <m-cube width="0.1" height="0.02" depth="0.02" y="1.45" z="0.42" color="#330000"></m-cube>
 
   <!-- Speaker Grilles -->
-  <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="-0.3" color="#0a0a1a"></m-cube>
-  <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="0.3" color="#0a0a1a"></m-cube>
+  <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="-0.3" color="#150000"></m-cube>
+  <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="0.3" color="#150000"></m-cube>
 
-  <!-- Floor Base -->
-  <m-cube width="1.3" height="0.08" depth="0.9" y="0.04" color="#0d0d1f"></m-cube>
+  <!-- Floor Base — dark red -->
+  <m-cube width="1.3" height="0.08" depth="0.9" y="0.04" color="#1a0505"></m-cube>
 
   <!-- Difficulty Label -->
   <m-label content="⚠ EXPERT | KAIZO" y="0.65" z="0.42" width="0.9" height="0.1" font-size="11" color="#ff4400" alignment="center"></m-label>
@@ -59,21 +59,21 @@
   <!-- Status label — shows "Launching..." while Puppeteer boots -->
   <m-label id="status-label" content="" y="0.52" z="0.48" width="0.85" height="0.15" font-size="11" color="#ffff00" alignment="center"></m-label>
 
-  <!-- Info Card -->
-<m-image
-  id="info-card"
-  src="https://jdunk4.github.io/ARCADE1/KMW1%20-%20Info%20Card.png"
-  width="1.4" height="1.0"
-  x="1.4" y="1.5" z="0.46"
-  ry="-15"
-  visible="false">
-</m-image>
+  <!-- Info Card — positioned to the right at screen level -->
+  <m-image
+    id="info-card"
+    src="https://jdunk4.github.io/ARCADE1/KMW1%20-%20Info%20Card.png"
+    width="1.4" height="1.0"
+    x="1.4" y="1.5" z="0.46"
+    ry="-15"
+    visible="false">
+  </m-image>
 
   <!-- Position Probe -->
-  <m-position-probe range="3.0" id="probe"></m-position-probe>
+  <m-position-probe range="4.0" id="probe"></m-position-probe>
 
-  <!-- Interaction -->
-  <m-interaction id="play-btn" prompt="Press E to Play Kaizo Mario World" range="2.5"></m-interaction>
+  <!-- Interaction — centered on cabinet, wider range -->
+  <m-interaction id="play-btn" prompt="Press E to Play Kaizo Mario World" range="4.0" y="1.1"></m-interaction>
 
   <script>
     // ── Config ──────────────────────────────────────────────────────────
@@ -127,7 +127,6 @@
       socket.onmessage = function(msg) {
         var frame = JSON.parse(msg.data);
 
-        // Status messages from server (launching, ready, error)
         if (frame.type === "status") {
           statusLabel.setAttribute("content", frame.message);
           return;
@@ -137,7 +136,6 @@
           return;
         }
 
-        // Live frame — update screen image and clear status
         if (frame.image) {
           screen.setAttribute("src", frame.image);
           statusLabel.setAttribute("content", "");
