@@ -9,7 +9,7 @@ const wss    = new WebSocketServer({ server });
 
 // URL of your existing game.html on GitHub Pages
 // Puppeteer loads this exactly as a player's browser would
-const GAME_URL = process.env.GAME_URL || "https://jdunk4.github.io/Gamer/game.html";
+const GAME_URL = process.env.GAME_URL || "https://jdunk4.github.io/ARCADE1/game.html";
 
 // Target frame rate for screenshot streaming
 // 20fps = good balance of responsiveness vs Railway CPU/bandwidth cost
@@ -225,5 +225,5 @@ server.listen(PORT, () => {
 
 **Railway environment variables to set:**
 ```
-GAME_URL=https://jdunk4.github.io/Gamer/game.html
+GAME_URL=https://jdunk4.github.io/ARCADE1/game.html
 PORT=8081
