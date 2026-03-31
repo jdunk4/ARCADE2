@@ -1,7 +1,5 @@
 FROM node:18-slim
 
-# Install Chromium + Mesa software WebGL renderer
-# Mesa provides the GLctx/EGL support EmulatorJS needs
 RUN apt-get update && apt-get install -y \
     chromium \
     libgl1-mesa-dri \
@@ -9,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     libegl1-mesa \
     libgles2-mesa \
     mesa-utils \
+    xvfb \
     fonts-liberation \
     libappindicator3-1 \
     libasound2 \
@@ -30,16 +29,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
 COPY package.json .
 RUN npm install
 
-# Use system Chromium — skip Puppeteer's bundled download
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV DISPLAY=:99
 
 COPY . .
 
 EXPOSE 8081
 
-CMD ["node", "server-b.js"]
+# Start Xvfb virtual display then run server
+CMD Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & sleep 1 && node server-b.js
