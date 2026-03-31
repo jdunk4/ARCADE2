@@ -11,6 +11,8 @@ const wss = new WebSocketServer({ server });
 const GAME_URL = process.env.GAME_URL || "https://jdunk4.github.io/ARCADE1/game.html";
 const TARGET_FPS = 20;
 const FRAME_MS = 1000 / TARGET_FPS;
+
+// SNES native resolution - matches EmulatorJS canvas exactly
 const VIEWPORT_W = 512;
 const VIEWPORT_H = 448;
 
@@ -96,7 +98,7 @@ async function createSession(ws, romId, wallet) {
     req.continue();
   });
 
-  // Suppress translation noise, only log meaningful messages
+  // Suppress translation noise
   page.on("console", function(msg) {
     var text = msg.text();
     if (text.includes("Translation not found")) return;
@@ -108,6 +110,8 @@ async function createSession(ws, romId, wallet) {
   });
   page.on("requestfailed", function(req) {
     var failure = req.failure();
+    // Skip CDN json failures - we mock those
+    if (req.url().includes("cdn.emulatorjs.org") && req.url().endsWith(".json")) return;
     console.error("[browser] REQUEST FAILED: " + req.url() + " - " + (failure ? failure.errorText : "unknown"));
   });
 
@@ -116,7 +120,6 @@ async function createSession(ws, romId, wallet) {
 
   await page.goto(gameUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-  // Check WebGL status immediately after page load
   var webglStatus = await page.evaluate(function() {
     var canvas = document.createElement("canvas");
     var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
@@ -148,8 +151,7 @@ async function createSession(ws, romId, wallet) {
       return {
         hasCanvas: document.querySelectorAll("canvas").length,
         hasGame: document.getElementById("game") !== null,
-        bodyText: document.body.innerText.substring(0, 300),
-        iframes: document.querySelectorAll("iframe").length
+        bodyText: document.body.innerText.substring(0, 300)
       };
     });
     console.log("[session] page state: " + JSON.stringify(elements));
@@ -163,11 +165,25 @@ async function createSession(ws, romId, wallet) {
     return;
   }
 
+  // Wait for emulator to fully render
+  await new Promise(function(r) { setTimeout(r, 2000); });
+
+  // Dismiss any overlay/settings UI that EmulatorJS shows on load
+  // Click center of canvas to give it focus
   await page.click("canvas").catch(function() {
     console.warn("[session] canvas click failed");
   });
 
-  await new Promise(function(r) { setTimeout(r, 1000); });
+  // Press Escape to close any open menus/overlays
+  await page.keyboard.press("Escape");
+  await new Promise(function(r) { setTimeout(r, 300); });
+
+  // Press Escape again in case of nested menus
+  await page.keyboard.press("Escape");
+  await new Promise(function(r) { setTimeout(r, 300); });
+
+  console.log("[session] dismissed UI overlays");
+  await new Promise(function(r) { setTimeout(r, 500); });
 
   console.log("[session] starting frame loop at " + TARGET_FPS + "fps");
 
@@ -177,18 +193,19 @@ async function createSession(ws, romId, wallet) {
       return;
     }
     try {
+      // Screenshot just the game canvas, not the whole page
       var canvasEl = await page.$("canvas");
       var imageBase64;
       if (canvasEl) {
         imageBase64 = await canvasEl.screenshot({
           type: "jpeg",
-          quality: 65,
+          quality: 70,
           encoding: "base64"
         });
       } else {
         imageBase64 = await page.screenshot({
           type: "jpeg",
-          quality: 65,
+          quality: 70,
           encoding: "base64"
         });
       }
