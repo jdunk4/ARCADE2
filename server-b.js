@@ -47,9 +47,9 @@ async function createSession(ws, romId, wallet) {
   // Use plain puppeteer — no puppeteer-stream needed anymore
   const browser = await puppeteer.launch({
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
-    headless: false,
+    headless: false,  // Must be false — uses Xvfb display for WebGL + audio output
     defaultViewport: { width: VIEWPORT_W, height: VIEWPORT_H },
-    ignoreDefaultArgs: ["--mute-audio"],
+    ignoreDefaultArgs: ["--mute-audio"],  // Remove default mute so Chrome outputs audio
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
