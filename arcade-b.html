@@ -29,7 +29,7 @@
   <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="-0.3" color="#150000"></m-cube>
   <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="0.3" color="#150000"></m-cube>
   <m-cube width="1.3" height="0.08" depth="0.9" y="0.04" color="#1a0505"></m-cube>
-  <m-label content="EXPERT" y="0.65" z="0.42" width="0.9" height="0.1" font-size="" color="#ff4400" alignment="center"></m-label>
+  <m-label content="EXPERT" y="0.65" z="0.42" width="0.9" height="0.1" font-size="10" color="#ff4400" alignment="center"></m-label>
   <m-label id="completion-label" content="0 players completed" y="0.52" z="0.42" width="0.9" height="0.1" font-size="10" color="#aaaaff" alignment="center"></m-label>
   <m-label id="status-label" content="" y="0.38" z="0.42" width="0.85" height="0.12" font-size="11" color="#ffff00" alignment="center"></m-label>
 
@@ -76,73 +76,56 @@
     var ROM_ID         = "kaizo-mario-world-1";
     var WALLET         = "anonymous";
 
-    var screen      = document.getElementById("screen");
-    var probe       = document.getElementById("probe");
-    var card        = document.getElementById("info-card");
-    var compLabel   = document.getElementById("completion-label");
-    var statusLabel = document.getElementById("status-label");
-    var ctrlStatus  = document.getElementById("ctrl-status");
-    var playBtn     = document.getElementById("play-btn");
+    // ── Elements — looked up lazily to avoid null errors during boot ──────
+    function el(id) { return document.getElementById(id); }
 
     var socket     = null;
     var gameActive = false;
     var controllerConnected = false;
 
-    // ── Web Audio API setup for streaming audio playback ──────────────────
-    var audioCtx = null;
-    var audioQueue = [];
-    var audioPlaying = false;
+    // ── Web Audio API — only created after a user gesture ─────────────────
+    var audioCtx      = null;
     var nextAudioTime = 0;
 
-    function getAudioContext() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function resumeAudio() {
+      // Only create AudioContext after a real user gesture (E press / button press)
+      // This satisfies browser autoplay policy
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      } catch (e) {
+        // AudioContext not available in this context — silently ignore
       }
-      return audioCtx;
     }
 
-    // Decode a base64 WebM chunk and schedule it for playback
     function playAudioChunk(base64Data) {
+      if (!audioCtx) return; // Not yet initialized — skip until user gesture
       try {
-        var ctx = getAudioContext();
-
-        // Convert base64 to ArrayBuffer
         var binary = atob(base64Data);
         var buffer = new ArrayBuffer(binary.length);
         var view = new Uint8Array(buffer);
         for (var i = 0; i < binary.length; i++) {
           view[i] = binary.charCodeAt(i);
         }
-
-        // Decode and schedule playback
-        ctx.decodeAudioData(buffer, function(decoded) {
-          var source = ctx.createBufferSource();
+        audioCtx.decodeAudioData(buffer, function(decoded) {
+          var source = audioCtx.createBufferSource();
           source.buffer = decoded;
-          source.connect(ctx.destination);
-
-          var now = ctx.currentTime;
+          source.connect(audioCtx.destination);
+          var now = audioCtx.currentTime;
           var startAt = Math.max(now, nextAudioTime);
           source.start(startAt);
           nextAudioTime = startAt + decoded.duration;
-        }, function(err) {
-          // Silently ignore decode errors — chunks may arrive out of order
+        }, function() {
+          // Decode error — ignore, chunks may arrive incomplete
         });
-      } catch (e) {
-        // AudioContext may not be available in all MML contexts
-      }
+      } catch (e) {}
     }
 
-    // Resume audio context after user gesture (browser requirement)
-    function resumeAudio() {
-      if (audioCtx && audioCtx.state === "suspended") {
-        audioCtx.resume();
-      }
-      if (!audioCtx) {
-        getAudioContext();
-      }
-    }
-
-    // ── Controller setup ──────────────────────────────────────────────────
+    // ── Controller ────────────────────────────────────────────────────────
     var gamepadToSNES = {
       0: "b", 1: "a", 2: "y", 3: "x",
       4: "l", 5: "r",
@@ -200,18 +183,18 @@
     function setButtonPressed(rawIndex, displayIndex, pressed) {
       var map = buttonMap[displayIndex];
       if (!map) return;
-      var el = document.getElementById(map.id);
-      if (!el) return;
+      var elem = el(map.id);
+      if (!elem) return;
       if (pressed && !buttonStates[displayIndex]) {
         buttonStates[displayIndex] = true;
-        el.setAttribute("color", map.color);
-        el.setAttribute("y", map.pressY);
+        elem.setAttribute("color", map.color);
+        elem.setAttribute("y", map.pressY);
         var snesKey = gamepadToSNES[rawIndex];
         if (snesKey) sendGameInput(snesKey, "keyDown");
       } else if (!pressed && buttonStates[displayIndex]) {
         buttonStates[displayIndex] = false;
-        el.setAttribute("color", defaultColors[displayIndex] || "#3a3a5c");
-        el.setAttribute("y", defaultY[displayIndex]);
+        elem.setAttribute("color", defaultColors[displayIndex] || "#3a3a5c");
+        elem.setAttribute("y", defaultY[displayIndex]);
         var snesKey = gamepadToSNES[rawIndex];
         if (snesKey) sendGameInput(snesKey, "keyUp");
       }
@@ -233,8 +216,10 @@
       if (gp) {
         if (!controllerConnected) {
           controllerConnected = true;
-          ctrlStatus.setAttribute("content", "Controller ready! Press E to start.");
-          resumeAudio(); // User gesture — resume AudioContext
+          // FIX 1: null guard — ctrlStatus may not exist yet during boot
+          var cs = el("ctrl-status");
+          if (cs) cs.setAttribute("content", "Controller ready! Press E to start.");
+          resumeAudio();
         }
         gp.buttons.forEach(function(btn, rawIndex) {
           var displayIndex = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
@@ -244,8 +229,8 @@
         var axisX = gp.axes[0] || 0;
         var axisY = gp.axes[1] || 0;
         var threshold = 0.5;
-        var ls = document.getElementById("btn-ls");
-        var rs = document.getElementById("btn-rs");
+        var ls = el("btn-ls");
+        var rs = el("btn-rs");
         if (ls) { ls.setAttribute("x", -0.18 + axisX * 0.04); ls.setAttribute("z", 0.06 + axisY * 0.04); }
         if (rs) { rs.setAttribute("x", 0.18 + (gp.axes[2]||0) * 0.04); rs.setAttribute("z", 0.08 + (gp.axes[3]||0) * 0.04); }
         if (!buttonStates[14] && !buttonStates[15] && !buttonStates[12] && !buttonStates[13]) {
@@ -264,16 +249,18 @@
     window.addEventListener("gamepadconnected", function() { poll(); });
 
     // ── Arcade interaction ────────────────────────────────────────────────
-    playBtn.addEventListener("interact", function() {
-      resumeAudio(); // E press = user gesture, resume AudioContext
+    el("play-btn").addEventListener("interact", function() {
+      resumeAudio(); // FIX 2: AudioContext created here on first E press (user gesture)
       if (gameActive) { closeGame(); } else { launchGame(); }
     });
 
-    probe.addEventListener("positionenter", function() {
-      card.setAttribute("visible", "true");
+    el("probe").addEventListener("positionenter", function() {
+      var c = el("info-card");
+      if (c) c.setAttribute("visible", "true");
     });
-    probe.addEventListener("positionleave", function() {
-      card.setAttribute("visible", "false");
+    el("probe").addEventListener("positionleave", function() {
+      var c = el("info-card");
+      if (c) c.setAttribute("visible", "false");
       if (gameActive) closeGame();
     });
 
@@ -281,52 +268,66 @@
       socket = new WebSocket(SNES_SERVER_WS + "?rom=" + ROM_ID + "&wallet=" + WALLET);
 
       socket.onopen = function() {
-        ctrlStatus.setAttribute("content",
+        var cs = el("ctrl-status");
+        if (cs) cs.setAttribute("content",
           controllerConnected ? "Controller ready — play!" : "No controller detected");
       };
 
       socket.onmessage = function(msg) {
         var frame = JSON.parse(msg.data);
 
-        // Audio chunk — play it
         if (frame.type === "audio" && frame.data) {
           playAudioChunk(frame.data);
           return;
         }
-
-        if (frame.type === "status") { statusLabel.setAttribute("content", frame.message); return; }
-        if (frame.type === "error")  { statusLabel.setAttribute("content", "Error: " + frame.message); return; }
-
+        if (frame.type === "status") {
+          var sl = el("status-label");
+          if (sl) sl.setAttribute("content", frame.message);
+          return;
+        }
+        if (frame.type === "error") {
+          var sl = el("status-label");
+          if (sl) sl.setAttribute("content", "Error: " + frame.message);
+          return;
+        }
         if (frame.image) {
-          screen.setAttribute("src", frame.image);
-          statusLabel.setAttribute("content", "");
+          var sc = el("screen");
+          if (sc) sc.setAttribute("src", frame.image);
+          var sl = el("status-label");
+          if (sl) sl.setAttribute("content", "");
           if (!gameActive) {
             gameActive = true;
-            playBtn.setAttribute("prompt", "Press E to Close");
+            var pb = el("play-btn");
+            if (pb) pb.setAttribute("prompt", "Press E to Close");
             resumeAudio();
           }
         }
-
         if (frame.type === "completion") { logCompletion(); }
       };
 
       socket.onclose = function() {
         gameActive = false;
-        nextAudioTime = 0; // Reset audio timeline
-        screen.setAttribute("src", "https://jdunk4.github.io/ARCADE1/SMW%20-%20Kaizo%20Mario%20World%201.png");
-        statusLabel.setAttribute("content", "");
-        playBtn.setAttribute("prompt", "Press E to Play Kaizo Mario World");
+        nextAudioTime = 0;
+        var sc = el("screen");
+        if (sc) sc.setAttribute("src", "https://jdunk4.github.io/ARCADE1/SMW%20-%20Kaizo%20Mario%20World%201.png");
+        var sl = el("status-label");
+        if (sl) sl.setAttribute("content", "");
+        var pb = el("play-btn");
+        if (pb) pb.setAttribute("prompt", "Press E to Play Kaizo Mario World");
       };
 
       socket.onerror = function() {
-        statusLabel.setAttribute("content", "Connection failed");
+        var sl = el("status-label");
+        if (sl) sl.setAttribute("content", "Connection failed");
         socket.close();
       };
     }
 
     function launchGame() {
-      statusLabel.setAttribute("content", "Launching emulator...");
-      playBtn.setAttribute("prompt", "Launching...");
+      var sl = el("status-label");
+      if (sl) sl.setAttribute("content", "Launching emulator...");
+      var pb = el("play-btn");
+      if (pb) pb.setAttribute("prompt", "Launching...");
       nextAudioTime = 0;
       connectToServer();
     }
@@ -349,7 +350,8 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
           var count = data.count || 0;
-          compLabel.setAttribute("content", count + " player" + (count !== 1 ? "s" : "") + " completed");
+          var cl = el("completion-label");
+          if (cl) cl.setAttribute("content", count + " player" + (count !== 1 ? "s" : "") + " completed");
         }).catch(function() {});
     }
 
