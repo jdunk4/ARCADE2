@@ -1,286 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Arcade</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      overflow: hidden;
-    }
-    #game-container { width: 100%; height: 100%; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kaizo Mario World</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+background: #000;
+display: flex;
+justify-content: center;
+align-items: center;
+height: 100vh;
+overflow: hidden;
+}
+#game-container { width: 100%; height: 100%; }
 
-    /* Save/status indicator */
-    #status {
-      position: fixed;
-      top: 8px;
-      right: 10px;
-      font-family: monospace;
-      font-size: 11px;
-      color: #ffcc00;
-      background: rgba(0,0,0,0.7);
-      padding: 3px 8px;
-      border-radius: 4px;
-      z-index: 999;
-      display: none;
-    }
-
-    /* Error screen */
-    #error-screen {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: #000;
-      color: #ff4444;
-      font-family: monospace;
-      font-size: 14px;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 20px;
-      z-index: 9999;
-    }
-    #error-screen h2 { color: #ff4444; margin-bottom: 12px; font-size: 18px; }
-    #error-screen p  { color: #aaa; margin-top: 8px; font-size: 12px; }
-  </style>
+/* Save/status indicator */
+#status {
+position: fixed;
+top: 8px;
+right: 10px;
+font-family: monospace;
+font-size: 11px;
+color: #ffcc00;
+background: rgba(0,0,0,0.7);
+padding: 3px 8px;
+border-radius: 4px;
+z-index: 999;
+display: none;
+}
+</style>
 </head>
 <body>
-
 <div id="status"></div>
-
-<div id="error-screen">
-  <div>
-    <h2>⚠️ ROM Not Found</h2>
-    <div id="error-msg">Could not load the game.</div>
-    <p>Check that the ROM file is uploaded to the server.</p>
-  </div>
-</div>
-
 <div id="game-container">
-  <div id="game"></div>
+<div id="game"></div>
 </div>
 
 <script>
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CONFIG — all driven by URL params, with sensible fallbacks
-//
-// Usage:
-//   game.html?rom=smb3mix-rev2B-prg0.nes&core=nes&id=smb3mix-rev2b&title=SMB3%20Mix&wallet=0xABC
-//
-// Params:
-//   rom    — ROM filename on the server          (required)
-//   core   — emulator core: nes | snes | gba     (default: nes)
-//   id     — slug for save state & completion    (default: derived from rom filename)
-//   title  — display title for the page          (default: "Arcade")
-//   wallet — player wallet address               (default: "anonymous")
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const params = new URLSearchParams(window.location.search);
-
-const ROM_FILE = params.get("rom")    || "";
-const CORE     = params.get("core")   || "nes";
-const ROM_ID   = params.get("id")     || ROM_FILE.replace(/\.[^.]+$/, "").toLowerCase().replace(/\s+/g, "-");
-const TITLE    = params.get("title")  || "Arcade";
-const WALLET   = params.get("wallet") || "anonymous";
-
-// ── Server config ────────────────────────────────────────────────────────
-const SERVER    = "https://gamer-production.up.railway.app";
+// ── Config ──────────────────────────────────────────────────────────────
+const ROM_ID = "kaizo-mario-world-1";
+const SERVER = "https://gamer-production.up.railway.app";
 const ROM_TOKEN = "kaizo-arcade-2024-secret";
 
-// ── Set page title ────────────────────────────────────────────────────────
-document.title = TITLE;
+// Wallet comes from the MML world via URL param: game.html?wallet=0xABC
+const params = new URLSearchParams(window.location.search);
+const WALLET = params.get("wallet") || "anonymous";
 
-// ── Guard: show error if no ROM specified ─────────────────────────────────
-if (!ROM_FILE) {
-  const err = document.getElementById("error-screen");
-  document.getElementById("error-msg").textContent = "No ROM specified. Add ?rom=filename.nes to the URL.";
-  err.style.display = "flex";
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// EMULATORJS CONFIG
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-EJS_player        = "#game";
-EJS_core          = CORE;
-EJS_gameUrl       = `${SERVER}/rom/${encodeURIComponent(ROM_FILE)}?token=${ROM_TOKEN}`;
-EJS_pathtodata    = "https://cdn.emulatorjs.org/stable/data/";
+// ── EmulatorJS Config ───────────────────────────────────────────────────
+EJS_player = "#game";
+EJS_core = "snes";
+EJS_gameUrl = `${SERVER}/rom/Kaizo%20Mario%20(English).sfc?token=${ROM_TOKEN}`;
+EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
 EJS_startOnLoaded = true;
-EJS_color         = "#e8000d";
+EJS_color = "#e8000d";
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// STATUS HELPER
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// ── Status helper ────────────────────────────────────────────────────────
 function showStatus(msg, duration = 2500) {
-  const el = document.getElementById("status");
-  el.textContent = msg;
-  el.style.display = "block";
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => { el.style.display = "none"; }, duration);
+const el = document.getElementById("status");
+el.textContent = msg;
+el.style.display = "block";
+clearTimeout(el._timer);
+el._timer = setTimeout(() => { el.style.display = "none"; }, duration);
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// WAIT FOR EMULATOR TO BOOT
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// ── Save State: load on start ─────────────────────────────────────────────
+// EmulatorJS exposes EJS_emulator after boot — we hook in once it's ready
 function waitForEmulator(callback, attempts = 0) {
-  if (typeof EJS_emulator !== "undefined" && EJS_emulator.gameManager) {
-    callback(EJS_emulator);
-  } else if (attempts < 60) {
-    setTimeout(() => waitForEmulator(callback, attempts + 1), 500);
-  } else {
-    showStatus("⚠️ Emulator failed to start", 8000);
-  }
+if (typeof EJS_emulator !== "undefined" && EJS_emulator.gameManager) {
+callback(EJS_emulator);
+} else if (attempts < 60) {
+setTimeout(() => waitForEmulator(callback, attempts + 1), 500);
 }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// SAVE STATES
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+}
 
 async function loadSaveState(emulator) {
-  if (WALLET === "anonymous") return;
-  try {
-    const res = await fetch(`${SERVER}/save?wallet=${WALLET}&rom=${ROM_ID}`);
-    const data = await res.json();
-    if (data.state) {
-      const binary = atob(data.state);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      emulator.gameManager.loadState(bytes);
-      showStatus("💾 Save loaded");
-    }
-  } catch (e) {
-    console.warn("Could not load save state:", e);
-  }
+if (WALLET === "anonymous") return;
+try {
+const res = await fetch(`${SERVER}/save?wallet=${WALLET}&rom=${ROM_ID}`);
+const data = await res.json();
+if (data.state) {
+// Convert base64 back to Uint8Array and load into emulator
+const binary = atob(data.state);
+const bytes = new Uint8Array(binary.length);
+for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+emulator.gameManager.loadState(bytes);
+showStatus("💾 Save loaded");
+}
+} catch (e) {
+console.warn("Could not load save state:", e);
+}
 }
 
 async function writeSaveState(emulator) {
-  if (WALLET === "anonymous") return;
-  try {
-    const stateBytes = emulator.gameManager.saveState();
-    const base64 = btoa(String.fromCharCode(...stateBytes));
-    await fetch(`${SERVER}/save`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: WALLET, rom: ROM_ID, state: base64 })
-    });
-    showStatus("💾 Saved");
-  } catch (e) {
-    console.warn("Could not write save state:", e);
-  }
+if (WALLET === "anonymous") return;
+try {
+const stateBytes = emulator.gameManager.saveState();
+// Convert to base64 for JSON transport
+const base64 = btoa(String.fromCharCode(...stateBytes));
+await fetch(`${SERVER}/save`, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ wallet: WALLET, rom: ROM_ID, state: base64 })
+});
+showStatus("💾 Saved");
+} catch (e) {
+console.warn("Could not write save state:", e);
+}
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// COMPLETION DETECTION
-// Memory addresses vary by game — add your ROM's address to the map below.
-// If a ROM isn't in the map, completion detection is silently skipped.
-//
-// To find the right address for a new game:
-//   1. Open the ROM in an emulator with RAM watch (e.g. Mesen for NES)
-//   2. Trigger the end credits / game clear screen
-//   3. Search for a RAM value that flips from 0 → 1 at that moment
-//   4. Add it to the map below using the ROM's id slug
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const COMPLETION_ADDRESSES = {
-  // NES SMB3-based hacks — game clear flag
-  "smb3mix-rev2b": 0x0772,
-
-  // SNES SMW-based hacks — end sequence flag
-  "kaizo-mario-world-1": 0x1F28,
-
-  // Add more ROMs here as you verify their addresses:
-  // "your-rom-id": 0xABCD,
-};
-
+// ── Completion detection ──────────────────────────────────────────────────
+// EmulatorJS doesn't natively detect credits — we use a memory watch.
+// For Kaizo Mario World (SMW base): credits trigger when SNES RAM
+// address 0x1F28 (end sequence flag) is set to 1.
+// This is a best-effort hook — adjust address per ROM hack as needed.
 async function logCompletion() {
-  try {
-    await fetch(`${SERVER}/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: WALLET, rom: ROM_ID })
-    });
-    showStatus("🏆 Completion recorded!", 5000);
-  } catch (e) {}
+try {
+await fetch(`${SERVER}/complete`, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ wallet: WALLET, rom: ROM_ID })
+});
+showStatus("🏆 Completion recorded!", 5000);
+} catch (e) {}
 }
 
 function startMemoryWatch(emulator) {
-  const address = COMPLETION_ADDRESSES[ROM_ID];
-
-  // Skip silently if this ROM has no address configured yet
-  if (!address) {
-    console.log(`[arcade] No completion address configured for ROM: ${ROM_ID}`);
-    return;
-  }
-
-  let completed = false;
-  setInterval(() => {
-    if (completed) return;
-    try {
-      const val = emulator.gameManager.getMemory(address);
-      if (val === 1) {
-        completed = true;
-        logCompletion();
-      }
-    } catch (e) {}
-  }, 3000);
+let completed = false;
+setInterval(() => {
+if (completed) return;
+try {
+// Read SNES end-sequence flag — adjust per ROM
+const val = emulator.gameManager.getMemory(0x1F28);
+if (val === 1) {
+completed = true;
+logCompletion();
+}
+} catch (e) {}
+}, 3000); // check every 3 seconds
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// AUTO-SAVE EVERY 60 SECONDS
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// ── Auto-save every 60 seconds ────────────────────────────────────────────
 function startAutoSave(emulator) {
-  setInterval(() => writeSaveState(emulator), 60000);
+setInterval(() => writeSaveState(emulator), 60000);
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// LOG "ACCESSED" FLAG (mushroom icon)
-// Fires as soon as the emulator boots — marks the cabinet as visited
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-async function logAccessed() {
-  if (WALLET === "anonymous") return;
-  try {
-    await fetch(`${SERVER}/accessed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: WALLET, rom: ROM_ID })
-    });
-  } catch (e) {}
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// BOOT SEQUENCE
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// ── Boot sequence ─────────────────────────────────────────────────────────
 window.addEventListener("load", () => {
-  if (!ROM_FILE) return; // error screen already shown
-
-  logAccessed();
-
-  waitForEmulator((emulator) => {
-    loadSaveState(emulator);
-    startAutoSave(emulator);
-    startMemoryWatch(emulator);
-  });
+waitForEmulator((emulator) => {
+loadSaveState(emulator);
+startAutoSave(emulator);
+startMemoryWatch(emulator);
+});
 });
 
-// Save on page unload (player closes tab or walks away from cabinet)
+// Save on page unload (player closes tab or walks away)
 window.addEventListener("beforeunload", () => {
-  if (typeof EJS_emulator !== "undefined" && EJS_emulator.gameManager) {
-    writeSaveState(EJS_emulator);
-  }
+if (typeof EJS_emulator !== "undefined" && EJS_emulator.gameManager) {
+writeSaveState(EJS_emulator);
+}
 });
-
 </script>
 
 <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
