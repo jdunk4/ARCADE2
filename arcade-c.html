@@ -190,7 +190,7 @@
     function poll() {
       var gp = getBestGamepad();
       if (gp) {
-        if (!controllerConnected) { controllerConnected = true; unlockAudio(); }
+        if (!controllerConnected) { controllerConnected = true; }
         gp.buttons.forEach(function(btn, rawIndex) {
           var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
           setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5);
