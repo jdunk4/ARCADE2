@@ -51,14 +51,15 @@ EXPOSE 8081
 # 3. Load null sink module so Chrome has somewhere to output audio
 # 4. Start Xvfb virtual display
 # 5. Start Node server
-CMD mkdir -p /tmp/pulse && \
+CMD Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & \
+    sleep 2 && \
+    mkdir -p /tmp/pulse && \
     pulseaudio --system \
                --disallow-module-loading=false \
                --disallow-exit \
                --daemonize=true && \
-    sleep 3 && \
+    sleep 5 && \
     pactl load-module module-null-sink sink_name=virtual_speaker sink_properties=device.description=VirtualSpeaker && \
     pactl set-default-sink virtual_speaker && \
     echo "PulseAudio ready with virtual_speaker sink" && \
-    Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & \
-    sleep 2 && node server-b.js
+    node server-b.js
