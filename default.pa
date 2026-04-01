@@ -1,0 +1,3 @@
+load-module module-native-protocol-unix
+load-module module-null-sink sink_name=virtual_speaker
+set-default-sink virtual_speaker
