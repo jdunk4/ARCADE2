@@ -1,12 +1,6 @@
 /**
  * server-b.js — Multi-ROM Path B streaming server
- *
- * Each WebSocket connection gets its own isolated emulator process.
- * The client passes ?rom=filename.nes&core=nes&session=abc&wallet=0xABC
- * The server boots a headless emulator for that ROM and streams
- * frames + audio back over the same WebSocket.
- *
- * Simultaneous players on different ROMs = fully isolated, no interference.
+ * Uses RetroArch with snes9x/nestopia cores for SNES/NES emulation
  */
 
 const http       = require("http");
@@ -16,56 +10,50 @@ const path       = require("path");
 const fs         = require("fs");
 const url        = require("url");
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CONFIG
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const PORT         = process.env.PORT || 3000;
-const ROM_DIR      = path.join(__dirname, "ROM");   // ROMs stored here
-const MAX_SESSIONS = 50;                             // hard cap on simultaneous players
-const FRAME_RATE   = 20;                             // frames per second to stream
+const PORT         = process.env.PORT || 8080;
+const ROM_DIR      = path.join(__dirname, "ROM");
+const MAX_SESSIONS = 50;
+const FRAME_RATE   = 20;
 
-// Allowed ROM files — whitelist prevents path traversal attacks
-// Add each ROM filename here as you upload them
+// RetroArch core paths
+const CORES = {
+  snes: "/root/.config/retroarch/cores/snes9x_libretro.so",
+  nes:  "/root/.config/retroarch/cores/nestopia_libretro.so",
+};
+
+// Allowlist of permitted ROM filenames
 const ALLOWED_ROMS = new Set([
   "smb3mix-rev2B-prg0.nes",
   "Kaizo Mario (English).sfc",
-  // Add more as you go:
-  // "another-hack.nes",
-  // "some-smw-hack.sfc",
+  // Add more here as you upload them
 ]);
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SESSION STORE
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// sessionId → { ws, emulatorProcess, romId, wallet, frameTimer }
 const sessions = new Map();
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// HTTP SERVER (health check + ROM serving)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// HTTP SERVER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const server = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url, true);
+  const parsedUrl = new url.URL(req.url, `http://localhost`);
 
-  // Health check
   if (parsedUrl.pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({
-      status: "ok",
-      sessions: sessions.size,
-      max: MAX_SESSIONS
-    }));
+    res.end(JSON.stringify({ status: "ok", sessions: sessions.size, max: MAX_SESSIONS }));
     return;
   }
 
-  // Active sessions list (for debugging)
   if (parsedUrl.pathname === "/sessions") {
     const list = [];
-    sessions.forEach((s, id) => {
-      list.push({ id, rom: s.romFile, wallet: s.wallet });
-    });
+    sessions.forEach((s, id) => list.push({ id, rom: s.romFile, wallet: s.wallet }));
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(list));
     return;
@@ -75,151 +63,126 @@ const server = http.createServer((req, res) => {
   res.end("Not found");
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // WEBSOCKET SERVER
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const wss = new WebSocket.Server({ server });
 
 wss.on("connection", (ws, req) => {
   const params    = new url.URL(req.url, `http://localhost`).searchParams;
   const romFile   = params.get("rom")     || "";
-  const core      = params.get("core")    || "nes";
+  const core      = params.get("core")    || "snes";
   const sessionId = params.get("session") || Math.random().toString(36).slice(2);
   const wallet    = params.get("wallet")  || "anonymous";
 
   console.log(`[${sessionId}] New connection — ROM: ${romFile} | core: ${core} | wallet: ${wallet}`);
 
-  // ── Validate ROM ────────────────────────────────────────────
-  if (!romFile) {
-    sendError(ws, "No ROM specified");
-    ws.close();
-    return;
-  }
-
-  if (!ALLOWED_ROMS.has(romFile)) {
-    sendError(ws, `ROM not in allowlist: ${romFile}`);
-    ws.close();
-    return;
-  }
+  // Validate ROM
+  if (!romFile) { sendError(ws, "No ROM specified"); ws.close(); return; }
+  if (!ALLOWED_ROMS.has(romFile)) { sendError(ws, `ROM not allowed: ${romFile}`); ws.close(); return; }
 
   const romPath = path.join(ROM_DIR, romFile);
-  if (!fs.existsSync(romPath)) {
-    sendError(ws, `ROM file not found on server: ${romFile}`);
-    ws.close();
-    return;
-  }
+  if (!fs.existsSync(romPath)) { sendError(ws, `ROM file not found: ${romFile}`); ws.close(); return; }
 
-  // ── Session cap ─────────────────────────────────────────────
-  if (sessions.size >= MAX_SESSIONS) {
-    sendError(ws, "Server is full. Try again later.");
-    ws.close();
-    return;
-  }
+  // Session cap
+  if (sessions.size >= MAX_SESSIONS) { sendError(ws, "Server is full. Try again later."); ws.close(); return; }
 
-  // ── Boot emulator for this session ──────────────────────────
-  const session = {
-    ws,
-    romFile,
-    romId: romFile.replace(/\.[^.]+$/, "").toLowerCase().replace(/[\s]+/g, "-"),
-    wallet,
-    emulator: null,
-    frameTimer: null,
-    audioProcess: null,
-  };
+  // Validate core
+  const corePath = CORES[core];
+  if (!corePath) { sendError(ws, `Unknown core: ${core}`); ws.close(); return; }
 
+  const session = { ws, romFile, romId: romFile.replace(/\.[^.]+$/, "").toLowerCase().replace(/\s+/g, "-"), wallet, emulator: null, xvfb: null, ffmpegVideo: null, ffmpegAudio: null };
   sessions.set(sessionId, session);
+
   sendStatus(ws, "Booting emulator...");
+  bootEmulator(session, sessionId, romPath, core, corePath);
 
-  bootEmulator(session, sessionId, romPath, core);
-
-  // ── Handle input from client ─────────────────────────────────
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data);
-      if (msg.type === "keyDown" || msg.type === "keyUp") {
-        forwardInput(session, msg);
-      }
+      if (msg.type === "keyDown" || msg.type === "keyUp") forwardInput(session, msg);
     } catch (e) {}
   });
 
-  // ── Cleanup on disconnect ────────────────────────────────────
-  ws.on("close", () => {
-    console.log(`[${sessionId}] Disconnected — tearing down emulator`);
-    teardown(sessionId);
-  });
-
-  ws.on("error", () => {
-    teardown(sessionId);
-  });
+  ws.on("close", () => { console.log(`[${sessionId}] Disconnected`); teardown(sessionId); });
+  ws.on("error", () => teardown(sessionId));
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// EMULATOR BOOT
-//
-// This uses the same headless Snes9x/fceux pattern as your
-// original server-b.js — just parameterized per session.
-// Each session gets its own process + unique display/audio device.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// EMULATOR BOOT — RetroArch headless
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function bootEmulator(session, sessionId, romPath, core) {
-  // Each session gets a unique virtual display number to avoid conflicts
-  const displayNum = 10 + (sessions.size % 90); // :10 through :99
+function bootEmulator(session, sessionId, romPath, core, corePath) {
+  // Unique display per session (:10 through :99)
+  const displayNum = 10 + (sessions.size % 90);
   const display    = `:${displayNum}`;
-  const audioSink  = `session_${sessionId}`;
 
-  // Start virtual display (Xvfb)
-  const xvfb = spawn("Xvfb", [display, "-screen", "0", "256x240x24"], {
-    detached: false,
-    stdio: "ignore"
+  // Start virtual display
+  const xvfb = spawn("Xvfb", [display, "-screen", "0", "256x224x24"], {
+    detached: false, stdio: "ignore"
   });
 
-  // Choose emulator binary based on core
-  const emulatorCmd  = core === "snes" ? "snes9x-gtk" : "fceux";
-  const emulatorArgs = core === "snes"
-    ? [romPath]
-    : ["--no-gui", "--sound", "1", romPath];
-
-  // Start emulator on the virtual display
-  const emulator = spawn(emulatorCmd, emulatorArgs, {
-    env: { ...process.env, DISPLAY: display },
-    detached: false,
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-
-  emulator.on("error", (err) => {
-    console.error(`[${sessionId}] Emulator error: ${err.message}`);
-    sendError(session.ws, "Emulator failed to start: " + err.message);
+  xvfb.on("error", (err) => {
+    console.error(`[${sessionId}] Xvfb error: ${err.message}`);
     teardown(sessionId);
   });
 
-  emulator.on("exit", (code) => {
-    console.log(`[${sessionId}] Emulator exited (code ${code})`);
-    teardown(sessionId);
-  });
+  session.xvfb    = xvfb;
+  session.display = display;
 
-  session.emulator = emulator;
-  session.xvfb     = xvfb;
-  session.display  = display;
-
-  // Give emulator 1.5s to boot, then start streaming
+  // Give Xvfb a moment to start
   setTimeout(() => {
-    if (!sessions.has(sessionId)) return; // already disconnected
-    startFrameStream(session, sessionId, display);
-    startAudioStream(session, sessionId, display);
-    sendStatus(session.ws, "");
-  }, 1500);
+    if (!sessions.has(sessionId)) return;
+
+    // Launch RetroArch with the appropriate core and ROM
+    const emulator = spawn("retroarch", [
+      "--libretro", corePath,
+      "--fullscreen",
+      "--no-stdin",
+      romPath
+    ], {
+      env: {
+        ...process.env,
+        DISPLAY:      display,
+        PULSE_SERVER: "unix:/tmp/pulse/native",
+      },
+      detached: false,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    emulator.on("error", (err) => {
+      console.error(`[${sessionId}] Emulator error: ${err.message}`);
+      sendError(session.ws, "Emulator failed to start: " + err.message);
+      teardown(sessionId);
+    });
+
+    emulator.on("exit", (code) => {
+      console.log(`[${sessionId}] Emulator exited (code ${code})`);
+      teardown(sessionId);
+    });
+
+    session.emulator = emulator;
+
+    // Give RetroArch 2s to boot, then start streaming
+    setTimeout(() => {
+      if (!sessions.has(sessionId)) return;
+      startFrameStream(session, sessionId, display);
+      startAudioStream(session, sessionId);
+      sendStatus(session.ws, "");
+    }, 2000);
+
+  }, 500);
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FRAME STREAMING
-// Captures the virtual display with ffmpeg → base64 PNG → WebSocket
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function startFrameStream(session, sessionId, display) {
   const ffmpeg = spawn("ffmpeg", [
-    "-f",         "x11grab",
-    "-video_size", "256x240",
+    "-f",          "x11grab",
+    "-video_size", "256x224",
     "-framerate",  String(FRAME_RATE),
     "-i",          display,
     "-vf",         `fps=${FRAME_RATE}`,
@@ -233,19 +196,18 @@ function startFrameStream(session, sessionId, display) {
   ffmpeg.stdout.on("data", (chunk) => {
     buf = Buffer.concat([buf, chunk]);
 
-    // PNG files start with \x89PNG and end with IEND\xAE\x42\x60\x82
+    // Find PNG start signature
     let start = -1;
     for (let i = 0; i < buf.length - 8; i++) {
       if (buf[i] === 0x89 && buf[i+1] === 0x50 && buf[i+2] === 0x4E && buf[i+3] === 0x47) {
-        start = i;
-        break;
+        start = i; break;
       }
     }
-
     if (start === -1) return;
 
+    // Find PNG end signature (IEND chunk)
     const IEND = Buffer.from([0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82]);
-    const end = buf.indexOf(IEND, start);
+    const end  = buf.indexOf(IEND, start);
     if (end === -1) return;
 
     const frame = buf.slice(start, end + 8);
@@ -258,91 +220,66 @@ function startFrameStream(session, sessionId, display) {
     }
   });
 
-  ffmpeg.on("exit", () => {
-    console.log(`[${sessionId}] Frame stream ended`);
-  });
-
+  ffmpeg.on("exit", () => console.log(`[${sessionId}] Frame stream ended`));
   session.ffmpegVideo = ffmpeg;
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // AUDIO STREAMING
-// Captures PulseAudio output → WebM Opus chunks → base64 → WebSocket
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function startAudioStream(session, sessionId, display) {
+function startAudioStream(session, sessionId) {
   const ffmpegAudio = spawn("ffmpeg", [
-    "-f",          "pulse",
-    "-i",          "default",
-    "-acodec",     "libopus",
-    "-b:a",        "64k",
-    "-f",          "webm",
+    "-f",    "pulse",
+    "-i",    "default",
+    "-acodec", "libopus",
+    "-b:a",  "64k",
+    "-f",    "webm",
     "-cluster_size_limit", "2M",
     "-cluster_time_limit", "2000",
     "pipe:1"
   ], {
-    env: { ...process.env, DISPLAY: display },
+    env: { ...process.env, PULSE_SERVER: "unix:/tmp/pulse/native" },
     stdio: ["ignore", "pipe", "ignore"]
   });
 
   ffmpegAudio.stdout.on("data", (chunk) => {
     if (session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify({
-        type:  "audio",
-        data:  chunk.toString("base64")
-      }));
+      session.ws.send(JSON.stringify({ type: "audio", data: chunk.toString("base64") }));
     }
   });
 
-  ffmpegAudio.on("exit", () => {
-    console.log(`[${sessionId}] Audio stream ended`);
-  });
-
+  ffmpegAudio.on("exit", () => console.log(`[${sessionId}] Audio stream ended`));
   session.ffmpegAudio = ffmpegAudio;
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// INPUT FORWARDING
-// Sends keyboard events to the emulator process via xdotool
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// INPUT FORWARDING via xdotool
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// Key mapping: MML gamepad button name → X11 keysym
 const KEY_MAP = {
-  up:     "Up",
-  down:   "Down",
-  left:   "Left",
-  right:  "Right",
-  a:      "x",
-  b:      "z",
-  x:      "s",
-  y:      "a",
-  l:      "q",
-  r:      "w",
-  start:  "Return",
-  select: "shift",
+  up: "Up", down: "Down", left: "Left", right: "Right",
+  a: "x", b: "z", x: "s", y: "a",
+  l: "q", r: "w",
+  start: "Return", select: "shift",
 };
 
 function forwardInput(session, msg) {
   const keysym = KEY_MAP[msg.key];
   if (!keysym || !session.display) return;
-
   const action = msg.type === "keyDown" ? "keydown" : "keyup";
-
   execFile("xdotool", [action, "--clearmodifiers", keysym], {
     env: { ...process.env, DISPLAY: session.display }
-  }, (err) => {
-    if (err) console.warn(`[input] xdotool error: ${err.message}`);
-  });
+  }, (err) => { if (err) console.warn(`[input] xdotool: ${err.message}`); });
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// TEARDOWN — kill all processes for a session
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TEARDOWN
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function teardown(sessionId) {
   const session = sessions.get(sessionId);
   if (!session) return;
-
   sessions.delete(sessionId);
 
   const kill = (proc, name) => {
@@ -360,40 +297,29 @@ function teardown(sessionId) {
   console.log(`[${sessionId}] Teardown complete. Active sessions: ${sessions.size}`);
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // HELPERS
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function sendStatus(ws, message) {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "status", message }));
-  }
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "status", message }));
 }
 
 function sendError(ws, message) {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "error", message }));
-  }
+  console.error("Error:", message);
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "error", message }));
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CLEANUP ON SERVER SHUTDOWN
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SHUTDOWN
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received — tearing down all sessions");
-  sessions.forEach((_, id) => teardown(id));
-  process.exit(0);
-});
+process.on("SIGTERM", () => { sessions.forEach((_, id) => teardown(id)); process.exit(0); });
+process.on("SIGINT",  () => { sessions.forEach((_, id) => teardown(id)); process.exit(0); });
 
-process.on("SIGINT", () => {
-  sessions.forEach((_, id) => teardown(id));
-  process.exit(0);
-});
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // START
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 server.listen(PORT, () => {
   console.log(`🕹️  Multi-ROM arcade server running on port ${PORT}`);
