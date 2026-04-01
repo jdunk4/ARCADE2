@@ -241,7 +241,11 @@
 
       socket.onmessage = function (msg) {
         var frame = JSON.parse(msg.data);
-        if (frame.type === "audio" && frame.data) { playAudioChunk(frame.data); return; }
+        if (frame.type === "audio" && frame.data) { 
+  resumeAudio();  // ← add this line
+  playAudioChunk(frame.data); 
+  return; 
+}
         if (frame.type === "status") { set("status-label", "content", frame.message); return; }
         if (frame.type === "error")  { set("status-label", "content", "Error: " + frame.message); return; }
         if (frame.type === "completion") { logCompletion(); return; }
