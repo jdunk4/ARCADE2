@@ -44,12 +44,11 @@ const sessions = new Map();
 async function createSession(ws, romId, wallet) {
   console.log("[session] creating: rom=" + romId + " wallet=" + wallet);
 
-  // Use plain puppeteer — no puppeteer-stream needed anymore
   const browser = await puppeteer.launch({
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
-    headless: false,  // Must be false — uses Xvfb display for WebGL + audio output
+    headless: false,
     defaultViewport: { width: VIEWPORT_W, height: VIEWPORT_H },
-    ignoreDefaultArgs: ["--mute-audio"],  // Remove default mute so Chrome outputs audio
+    ignoreDefaultArgs: ["--mute-audio"],
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -153,9 +152,7 @@ async function createSession(ws, romId, wallet) {
   await page.mouse.click(VIEWPORT_W / 2, VIEWPORT_H / 2);
   await new Promise(function(r) { setTimeout(r, 500); });
 
-  // ── Capture audio from PulseAudio sink via ffmpeg ─────────────────────
-  // ffmpeg reads from the virtual_speaker.monitor (what Chrome outputs)
-  // and encodes it as opus WebM chunks sent over WebSocket
+  // ── Capture audio from PulseAudio via ffmpeg ──────────────────────────
   var ffmpegProc = null;
   try {
     console.log("[session] starting ffmpeg audio capture from PulseAudio...");
@@ -180,12 +177,9 @@ async function createSession(ws, romId, wallet) {
       }
     });
 
+    // Log ALL ffmpeg output so we can see exactly what's happening
     ffmpegProc.stderr.on("data", function(d) {
-      var line = d.toString().trim();
-      // Only log first few lines to avoid log spam
-      if (line.includes("Stream") || line.includes("Error") || line.includes("error")) {
-        console.log("[ffmpeg] " + line);
-      }
+      console.log("[ffmpeg] " + d.toString().trim());
     });
 
     ffmpegProc.on("close", function(code) {
