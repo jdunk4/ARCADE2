@@ -43,11 +43,9 @@ COPY . .
 
 EXPOSE 8081
 
-CMD pulseaudio --system \
-    --disallow-module-loading=false \
-    --exit-idle-time=-1 \
-    --load-module=module-null-sink \
-    --daemonize=true && \
-    sleep 3 && \
+CMD pulseaudio --system --disallow-module-loading=false --exit-idle-time=-1 --daemonize=true && \
+    sleep 5 && \
+    pactl load-module module-null-sink sink_name=virtual_speaker && \
+    pactl set-default-sink virtual_speaker && \
     Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & \
     sleep 2 && node server-b.js
