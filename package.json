@@ -6,12 +6,11 @@
   "scripts": {
     "start": "node server-b.js"
   },
-"dependencies": {
-  "express": "latest",
-  "puppeteer": "latest",
-  "puppeteer-stream": "latest",
-  "ws": "latest"
-}
+  "dependencies": {
+    "express": "latest",
+    "puppeteer": "latest",
+    "puppeteer-stream": "latest",
+    "ws": "latest"
   },
   "engines": {
     "node": ">=18.0.0"
