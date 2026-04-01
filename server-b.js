@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const GAME_BASE_URL = process.env.GAME_URL    || "https://jdunk4.github.io/ARCADE1/game.html";
-const LOADING_URL   = process.env.LOADING_URL || "https://jdunk4.github.io/ARCADE2/loading.html";
+const LOADING_URL   = process.env.LOADING_URL || "https://jdunk4.github.io/ARCADE1/loading.html";
 const TARGET_FPS    = 20;
 const FRAME_MS      = 1000 / TARGET_FPS;
 const VIEWPORT_W    = 512;
