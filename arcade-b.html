@@ -1,4 +1,4 @@
-m-group>
+<m-group>
 
   <!-- Cabinet Body — deep red -->
   <m-cube width="1.2" height="2.2" depth="0.8" y="1.1" color="#2a0a0a"></m-cube>
@@ -114,8 +114,12 @@ m-group>
       } catch(e) {}
     }
 
+    var MAX_AUDIO_QUEUE = 3;
+
     function flushAudioQueue() {
       if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
+      // Drop stale chunks if queue is backed up — prevents overlapping audio
+      while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
       var chunk = audioChunkQueue.shift();
       try { sourceBuffer.appendBuffer(chunk); } catch(e) { audioChunkQueue = []; return; }
       sourceBuffer.addEventListener("updateend", function onUpdate() {
@@ -200,7 +204,6 @@ m-group>
     function poll() {
       var gp = getBestGamepad();
       if (gp) {
-        if (!controllerConnected) { controllerConnected = true; unlockAudio(); }
         if (!controllerConnected) { controllerConnected = true; }
         gp.buttons.forEach(function(btn, rawIndex) {
           var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
@@ -298,6 +301,7 @@ m-group>
     setTimeout(function() {
       poll();
       window.addEventListener("gamepadconnected", function() { poll(); });
+
       var playBtn = document.getElementById("play-btn");
       if (playBtn) playBtn.addEventListener("interact", function() {
         unlockAudio(); // ← unlock AudioContext on user gesture (press E)
