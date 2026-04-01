@@ -1,276 +1,403 @@
-const express = require("express");
-const http = require("http");
-const { WebSocketServer } = require("ws");
-const puppeteer = require("puppeteer");
-const { spawn } = require("child_process");
-const fs = require("fs");
+/**
+ * server-b.js — Multi-ROM Path B streaming server
+ *
+ * Each WebSocket connection gets its own isolated emulator process.
+ * The client passes ?rom=filename.nes&core=nes&session=abc&wallet=0xABC
+ * The server boots a headless emulator for that ROM and streams
+ * frames + audio back over the same WebSocket.
+ *
+ * Simultaneous players on different ROMs = fully isolated, no interference.
+ */
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const http       = require("http");
+const WebSocket  = require("ws");
+const { execFile, spawn } = require("child_process");
+const path       = require("path");
+const fs         = require("fs");
+const url        = require("url");
 
-const GAME_URL = process.env.GAME_URL || "https://jdunk4.github.io/ARCADE1/game.html";
-const TARGET_FPS = 20;
-const FRAME_MS = 1000 / TARGET_FPS;
-const VIEWPORT_W = 512;
-const VIEWPORT_H = 448;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONFIG
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
-  next();
-});
+const PORT         = process.env.PORT || 3000;
+const ROM_DIR      = path.join(__dirname, "ROM");   // ROMs stored here
+const MAX_SESSIONS = 50;                             // hard cap on simultaneous players
+const FRAME_RATE   = 20;                             // frames per second to stream
 
-app.get("/", (req, res) => res.send("SNES Puppeteer streaming server OK"));
+// Allowed ROM files — whitelist prevents path traversal attacks
+// Add each ROM filename here as you upload them
+const ALLOWED_ROMS = new Set([
+  "smb3mix-rev2B-prg0.nes",
+  "Kaizo Mario (English).sfc",
+  // Add more as you go:
+  // "another-hack.nes",
+  // "some-smw-hack.sfc",
+]);
 
-app.get("/debug-screenshot.jpg", (req, res) => {
-  var p = "/tmp/debug-screenshot.jpg";
-  if (fs.existsSync(p)) {
-    res.setHeader("Content-Type", "image/jpeg");
-    res.sendFile(p);
-  } else {
-    res.status(404).send("No screenshot yet");
-  }
-});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SESSION STORE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const KEY_MAP = {
-  up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight",
-  a: "z", b: "x", x: "a", y: "s",
-  start: "Enter", select: "Shift", l: "q", r: "w"
-};
-
+// sessionId → { ws, emulatorProcess, romId, wallet, frameTimer }
 const sessions = new Map();
 
-async function createSession(ws, romId, wallet) {
-  console.log("[session] creating: rom=" + romId + " wallet=" + wallet);
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// HTTP SERVER (health check + ROM serving)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
-    headless: false,
-    defaultViewport: { width: VIEWPORT_W, height: VIEWPORT_H },
-    ignoreDefaultArgs: ["--mute-audio"],
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--enable-webgl",
-      "--enable-webgl2",
-      "--ignore-gpu-blocklist",
-      "--ignore-gpu-blacklist",
-      "--autoplay-policy=no-user-gesture-required",
-      "--enable-features=SharedArrayBuffer",
-      "--display=:99",
-      "--use-fake-ui-for-media-stream"
-    ]
-  });
+const server = http.createServer((req, res) => {
+  const parsedUrl = url.parse(req.url, true);
 
-  const page = await browser.newPage();
-  await page.setViewport({ width: VIEWPORT_W, height: VIEWPORT_H });
-
-  await page.evaluateOnNewDocument(function() {
-    Object.defineProperty(window, "crossOriginIsolated", { get: function() { return true; } });
-    if (typeof SharedArrayBuffer === "undefined") window.SharedArrayBuffer = ArrayBuffer;
-  });
-
-  await page.setRequestInterception(true);
-  page.on("request", function(req) {
-    var url = req.url();
-    if (url.includes("cdn.emulatorjs.org") && url.endsWith(".json")) {
-      req.respond({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: "{}" });
-      return;
-    }
-    req.continue();
-  });
-
-  page.on("console", function(msg) {
-    var text = msg.text();
-    if (text.includes("Translation not found")) return;
-    if (text.includes("Language set to")) return;
-    console.log("[browser] " + msg.type() + ": " + text);
-  });
-  page.on("pageerror", function(err) { console.error("[browser] PAGE ERROR: " + err.message); });
-
-  var gameUrl = GAME_URL + "?wallet=" + encodeURIComponent(wallet) + "&rom=" + encodeURIComponent(romId);
-  console.log("[session] navigating to: " + gameUrl);
-  await page.goto(gameUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-
-  var webglStatus = await page.evaluate(function() {
-    var canvas = document.createElement("canvas");
-    var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) return "WebGL NOT available";
-    return "WebGL OK: " + gl.getParameter(gl.VERSION);
-  });
-  console.log("[session] WebGL check: " + webglStatus);
-
-  var keepalive = setInterval(function() {
-    if (ws.readyState === 1) ws.send(JSON.stringify({ type: "status", message: "Loading emulator..." }));
-  }, 3000);
-
-  var canvasFound = false;
-  try {
-    await page.waitForSelector("canvas", { timeout: 60000 });
-    canvasFound = true;
-    console.log("[session] canvas found");
-  } catch (e) {
-    console.warn("[session] canvas not found within 60s");
-    try { await page.screenshot({ path: "/tmp/debug-screenshot.jpg", type: "jpeg", quality: 80 }); } catch (se) {}
-  }
-
-  clearInterval(keepalive);
-
-  if (!canvasFound) {
-    ws.send(JSON.stringify({ type: "error", message: "Emulator failed to load" }));
-    await browser.close();
+  // Health check
+  if (parsedUrl.pathname === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      status: "ok",
+      sessions: sessions.size,
+      max: MAX_SESSIONS
+    }));
     return;
   }
 
-  // Wait for emulator to settle then find and click Play
-  await new Promise(function(r) { setTimeout(r, 8000); });
-
-  var allClickable = await page.evaluate(function() {
-    var results = [];
-    var els = document.querySelectorAll("button, [role='button'], span, div");
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      var text = (el.innerText || "").trim();
-      if (text && text.length < 30) {
-        var rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          results.push({ text: text, x: Math.round(rect.left + rect.width/2), y: Math.round(rect.top + rect.height/2) });
-        }
-      }
-    }
-    return results.slice(0, 30);
-  });
-
-  var playEl = allClickable.find(function(el) { return el.text === "Play"; });
-  if (playEl) {
-    console.log("[session] clicking Play at " + playEl.x + "," + playEl.y);
-    await page.mouse.click(playEl.x, playEl.y);
-    await new Promise(function(r) { setTimeout(r, 1000); });
-  }
-  await page.mouse.click(VIEWPORT_W / 2, VIEWPORT_H / 2);
-  await new Promise(function(r) { setTimeout(r, 500); });
-
-  // ── Capture audio from PulseAudio via ffmpeg ──────────────────────────
-  var ffmpegProc = null;
-  try {
-    console.log("[session] starting ffmpeg audio capture from PulseAudio...");
-    ffmpegProc = spawn("ffmpeg", [
-      "-f", "pulse",
-      "-i", "virtual_speaker.monitor",
-      "-c:a", "libopus",
-      "-b:a", "64k",
-      "-vn",
-      "-f", "webm",
-      "-cluster_size_limit", "2M",
-      "-cluster_time_limit", "100",
-      "pipe:1"
-    ], { stdio: ["ignore", "pipe", "pipe"] });
-
-    ffmpegProc.stdout.on("data", function(chunk) {
-      if (ws.readyState !== 1) return;
-      try {
-        ws.send(JSON.stringify({ type: "audio", data: chunk.toString("base64") }));
-      } catch (e) {
-        console.warn("[ffmpeg] send error: " + e.message);
-      }
+  // Active sessions list (for debugging)
+  if (parsedUrl.pathname === "/sessions") {
+    const list = [];
+    sessions.forEach((s, id) => {
+      list.push({ id, rom: s.romFile, wallet: s.wallet });
     });
-
-    // Log ALL ffmpeg output so we can see exactly what's happening
-    ffmpegProc.stderr.on("data", function(d) {
-      console.log("[ffmpeg] " + d.toString().trim());
-    });
-
-    ffmpegProc.on("close", function(code) {
-      console.log("[ffmpeg] process exited with code " + code);
-    });
-
-    ffmpegProc.on("error", function(e) {
-      console.warn("[ffmpeg] failed to start: " + e.message);
-    });
-
-    console.log("[session] ffmpeg audio capture started");
-
-  } catch (e) {
-    console.warn("[session] ffmpeg audio setup failed: " + e.message);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(list));
+    return;
   }
 
-  // ── Video frame loop ──────────────────────────────────────────────────
-  console.log("[session] starting frame loop at " + TARGET_FPS + "fps");
+  res.writeHead(404);
+  res.end("Not found");
+});
 
-  var frameInterval = setInterval(async function() {
-    if (ws.readyState !== 1) { clearInterval(frameInterval); return; }
-    try {
-      var canvasEl = await page.$("canvas");
-      var imageBase64;
-      if (canvasEl) {
-        imageBase64 = await canvasEl.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
-      } else {
-        imageBase64 = await page.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
-      }
-      ws.send(JSON.stringify({ image: "data:image/jpeg;base64," + imageBase64 }), function(err) {
-        if (err) console.warn("[session] send error: " + err.message);
-      });
-    } catch (e) {
-      console.error("[session] screenshot failed: " + e.message);
-      clearInterval(frameInterval);
-      destroySession(ws);
-    }
-  }, FRAME_MS);
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// WEBSOCKET SERVER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  sessions.set(ws, { browser, page, frameInterval, ffmpegProc, wallet, romId });
-  console.log("[session] live: " + wallet + " / " + romId);
-}
+const wss = new WebSocket.Server({ server });
 
-async function destroySession(ws) {
-  var session = sessions.get(ws);
-  if (!session) return;
-  clearInterval(session.frameInterval);
-  if (session.ffmpegProc) {
-    try { session.ffmpegProc.kill("SIGTERM"); } catch (e) {}
-  }
-  try { await session.browser.close(); } catch (e) {}
-  sessions.delete(ws);
-  console.log("[session] destroyed: " + session.wallet + " / " + session.romId);
-}
+wss.on("connection", (ws, req) => {
+  const params    = new url.URL(req.url, `http://localhost`).searchParams;
+  const romFile   = params.get("rom")     || "";
+  const core      = params.get("core")    || "nes";
+  const sessionId = params.get("session") || Math.random().toString(36).slice(2);
+  const wallet    = params.get("wallet")  || "anonymous";
 
-wss.on("connection", async function(ws, req) {
-  var url = new URL(req.url, "http://localhost");
-  var romId = url.searchParams.get("rom") || "kaizo-mario-world-1";
-  var wallet = url.searchParams.get("wallet") || "anonymous";
+  console.log(`[${sessionId}] New connection — ROM: ${romFile} | core: ${core} | wallet: ${wallet}`);
 
-  console.log("[ws] connected: rom=" + romId + " wallet=" + wallet);
-  ws.send(JSON.stringify({ type: "status", message: "Launching emulator..." }));
-
-  try {
-    await createSession(ws, romId, wallet);
-    if (sessions.has(ws)) ws.send(JSON.stringify({ type: "status", message: "Emulator running!" }));
-  } catch (e) {
-    console.error("[ws] session creation failed: " + e.message);
-    ws.send(JSON.stringify({ type: "error", message: "Failed to start: " + e.message }));
+  // ── Validate ROM ────────────────────────────────────────────
+  if (!romFile) {
+    sendError(ws, "No ROM specified");
     ws.close();
     return;
   }
 
-  ws.on("message", async function(data) {
-    var session = sessions.get(ws);
-    if (!session) return;
+  if (!ALLOWED_ROMS.has(romFile)) {
+    sendError(ws, `ROM not in allowlist: ${romFile}`);
+    ws.close();
+    return;
+  }
+
+  const romPath = path.join(ROM_DIR, romFile);
+  if (!fs.existsSync(romPath)) {
+    sendError(ws, `ROM file not found on server: ${romFile}`);
+    ws.close();
+    return;
+  }
+
+  // ── Session cap ─────────────────────────────────────────────
+  if (sessions.size >= MAX_SESSIONS) {
+    sendError(ws, "Server is full. Try again later.");
+    ws.close();
+    return;
+  }
+
+  // ── Boot emulator for this session ──────────────────────────
+  const session = {
+    ws,
+    romFile,
+    romId: romFile.replace(/\.[^.]+$/, "").toLowerCase().replace(/[\s]+/g, "-"),
+    wallet,
+    emulator: null,
+    frameTimer: null,
+    audioProcess: null,
+  };
+
+  sessions.set(sessionId, session);
+  sendStatus(ws, "Booting emulator...");
+
+  bootEmulator(session, sessionId, romPath, core);
+
+  // ── Handle input from client ─────────────────────────────────
+  ws.on("message", (data) => {
     try {
-      var msg = JSON.parse(data);
-      var key = KEY_MAP[msg.key];
-      if (!key) return;
-      if (msg.type === "keyDown") await session.page.keyboard.down(key);
-      else if (msg.type === "keyUp") await session.page.keyboard.up(key);
-    } catch (e) { console.warn("[ws] input error: " + e.message); }
+      const msg = JSON.parse(data);
+      if (msg.type === "keyDown" || msg.type === "keyUp") {
+        forwardInput(session, msg);
+      }
+    } catch (e) {}
   });
 
-  ws.on("close", function() { console.log("[ws] disconnected: " + wallet); destroySession(ws); });
-  ws.on("error", function(e) { console.error("[ws] error: " + e.message); destroySession(ws); });
+  // ── Cleanup on disconnect ────────────────────────────────────
+  ws.on("close", () => {
+    console.log(`[${sessionId}] Disconnected — tearing down emulator`);
+    teardown(sessionId);
+  });
+
+  ws.on("error", () => {
+    teardown(sessionId);
+  });
 });
 
-var PORT = process.env.PORT || 8081;
-server.listen(PORT, function() {
-  console.log("Puppeteer SNES server on port " + PORT);
-  console.log("Streaming: " + TARGET_FPS + "fps JPEG from " + GAME_URL);
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// EMULATOR BOOT
+//
+// This uses the same headless Snes9x/fceux pattern as your
+// original server-b.js — just parameterized per session.
+// Each session gets its own process + unique display/audio device.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function bootEmulator(session, sessionId, romPath, core) {
+  // Each session gets a unique virtual display number to avoid conflicts
+  const displayNum = 10 + (sessions.size % 90); // :10 through :99
+  const display    = `:${displayNum}`;
+  const audioSink  = `session_${sessionId}`;
+
+  // Start virtual display (Xvfb)
+  const xvfb = spawn("Xvfb", [display, "-screen", "0", "256x240x24"], {
+    detached: false,
+    stdio: "ignore"
+  });
+
+  // Choose emulator binary based on core
+  const emulatorCmd  = core === "snes" ? "snes9x-gtk" : "fceux";
+  const emulatorArgs = core === "snes"
+    ? [romPath]
+    : ["--no-gui", "--sound", "1", romPath];
+
+  // Start emulator on the virtual display
+  const emulator = spawn(emulatorCmd, emulatorArgs, {
+    env: { ...process.env, DISPLAY: display },
+    detached: false,
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  emulator.on("error", (err) => {
+    console.error(`[${sessionId}] Emulator error: ${err.message}`);
+    sendError(session.ws, "Emulator failed to start: " + err.message);
+    teardown(sessionId);
+  });
+
+  emulator.on("exit", (code) => {
+    console.log(`[${sessionId}] Emulator exited (code ${code})`);
+    teardown(sessionId);
+  });
+
+  session.emulator = emulator;
+  session.xvfb     = xvfb;
+  session.display  = display;
+
+  // Give emulator 1.5s to boot, then start streaming
+  setTimeout(() => {
+    if (!sessions.has(sessionId)) return; // already disconnected
+    startFrameStream(session, sessionId, display);
+    startAudioStream(session, sessionId, display);
+    sendStatus(session.ws, "");
+  }, 1500);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FRAME STREAMING
+// Captures the virtual display with ffmpeg → base64 PNG → WebSocket
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function startFrameStream(session, sessionId, display) {
+  const ffmpeg = spawn("ffmpeg", [
+    "-f",         "x11grab",
+    "-video_size", "256x240",
+    "-framerate",  String(FRAME_RATE),
+    "-i",          display,
+    "-vf",         `fps=${FRAME_RATE}`,
+    "-vcodec",     "png",
+    "-f",          "image2pipe",
+    "pipe:1"
+  ], { stdio: ["ignore", "pipe", "ignore"] });
+
+  let buf = Buffer.alloc(0);
+
+  ffmpeg.stdout.on("data", (chunk) => {
+    buf = Buffer.concat([buf, chunk]);
+
+    // PNG files start with \x89PNG and end with IEND\xAE\x42\x60\x82
+    let start = -1;
+    for (let i = 0; i < buf.length - 8; i++) {
+      if (buf[i] === 0x89 && buf[i+1] === 0x50 && buf[i+2] === 0x4E && buf[i+3] === 0x47) {
+        start = i;
+        break;
+      }
+    }
+
+    if (start === -1) return;
+
+    const IEND = Buffer.from([0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82]);
+    const end = buf.indexOf(IEND, start);
+    if (end === -1) return;
+
+    const frame = buf.slice(start, end + 8);
+    buf = buf.slice(end + 8);
+
+    if (session.ws.readyState === WebSocket.OPEN) {
+      session.ws.send(JSON.stringify({
+        image: "data:image/png;base64," + frame.toString("base64")
+      }));
+    }
+  });
+
+  ffmpeg.on("exit", () => {
+    console.log(`[${sessionId}] Frame stream ended`);
+  });
+
+  session.ffmpegVideo = ffmpeg;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// AUDIO STREAMING
+// Captures PulseAudio output → WebM Opus chunks → base64 → WebSocket
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function startAudioStream(session, sessionId, display) {
+  const ffmpegAudio = spawn("ffmpeg", [
+    "-f",          "pulse",
+    "-i",          "default",
+    "-acodec",     "libopus",
+    "-b:a",        "64k",
+    "-f",          "webm",
+    "-cluster_size_limit", "2M",
+    "-cluster_time_limit", "2000",
+    "pipe:1"
+  ], {
+    env: { ...process.env, DISPLAY: display },
+    stdio: ["ignore", "pipe", "ignore"]
+  });
+
+  ffmpegAudio.stdout.on("data", (chunk) => {
+    if (session.ws.readyState === WebSocket.OPEN) {
+      session.ws.send(JSON.stringify({
+        type:  "audio",
+        data:  chunk.toString("base64")
+      }));
+    }
+  });
+
+  ffmpegAudio.on("exit", () => {
+    console.log(`[${sessionId}] Audio stream ended`);
+  });
+
+  session.ffmpegAudio = ffmpegAudio;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// INPUT FORWARDING
+// Sends keyboard events to the emulator process via xdotool
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Key mapping: MML gamepad button name → X11 keysym
+const KEY_MAP = {
+  up:     "Up",
+  down:   "Down",
+  left:   "Left",
+  right:  "Right",
+  a:      "x",
+  b:      "z",
+  x:      "s",
+  y:      "a",
+  l:      "q",
+  r:      "w",
+  start:  "Return",
+  select: "shift",
+};
+
+function forwardInput(session, msg) {
+  const keysym = KEY_MAP[msg.key];
+  if (!keysym || !session.display) return;
+
+  const action = msg.type === "keyDown" ? "keydown" : "keyup";
+
+  execFile("xdotool", [action, "--clearmodifiers", keysym], {
+    env: { ...process.env, DISPLAY: session.display }
+  }, (err) => {
+    if (err) console.warn(`[input] xdotool error: ${err.message}`);
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TEARDOWN — kill all processes for a session
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function teardown(sessionId) {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+
+  sessions.delete(sessionId);
+
+  const kill = (proc, name) => {
+    if (proc && !proc.killed) {
+      try { proc.kill("SIGTERM"); } catch (e) {}
+      console.log(`[${sessionId}] Killed ${name}`);
+    }
+  };
+
+  kill(session.emulator,    "emulator");
+  kill(session.ffmpegVideo, "ffmpegVideo");
+  kill(session.ffmpegAudio, "ffmpegAudio");
+  kill(session.xvfb,        "xvfb");
+
+  console.log(`[${sessionId}] Teardown complete. Active sessions: ${sessions.size}`);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// HELPERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function sendStatus(ws, message) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "status", message }));
+  }
+}
+
+function sendError(ws, message) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "error", message }));
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CLEANUP ON SERVER SHUTDOWN
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received — tearing down all sessions");
+  sessions.forEach((_, id) => teardown(id));
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  sessions.forEach((_, id) => teardown(id));
+  process.exit(0);
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// START
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+server.listen(PORT, () => {
+  console.log(`🕹️  Multi-ROM arcade server running on port ${PORT}`);
+  console.log(`   ROM directory: ${ROM_DIR}`);
+  console.log(`   Max sessions:  ${MAX_SESSIONS}`);
+  console.log(`   Allowed ROMs:  ${[...ALLOWED_ROMS].join(", ")}`);
 });
