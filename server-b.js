@@ -9,16 +9,12 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// ── CHANGE 1 of 3 ──────────────────────────────────────────────────────
-// Was: const GAME_URL = process.env.GAME_URL || "https://...game.html";
-// Now: base URL only — rom, core, id are appended per session
-const GAME_BASE_URL = process.env.GAME_URL || "https://jdunk4.github.io/ARCADE1/game.html";
-// ───────────────────────────────────────────────────────────────────────
-
-const TARGET_FPS = 20;
-const FRAME_MS = 1000 / TARGET_FPS;
-const VIEWPORT_W = 512;
-const VIEWPORT_H = 448;
+const GAME_BASE_URL  = process.env.GAME_URL    || "https://jdunk4.github.io/ARCADE1/game.html";
+const LOADING_URL    = process.env.LOADING_URL || "https://jdunk4.github.io/ARCADE2/loading.html";
+const TARGET_FPS     = 20;
+const FRAME_MS       = 1000 / TARGET_FPS;
+const VIEWPORT_W     = 512;
+const VIEWPORT_H     = 448;
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -46,11 +42,7 @@ const KEY_MAP = {
 
 const sessions = new Map();
 
-// ── CHANGE 2 of 3 ──────────────────────────────────────────────────────
-// Was: createSession(ws, romId, wallet)
-// Now: also receives romFile and romCore so game.html loads the right ROM
 async function createSession(ws, romFile, romCore, romId, wallet) {
-// ───────────────────────────────────────────────────────────────────────
   console.log("[session] creating: rom=" + romFile + " core=" + romCore + " wallet=" + wallet);
 
   const browser = await puppeteer.launch({
@@ -81,6 +73,22 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
     if (typeof SharedArrayBuffer === "undefined") window.SharedArrayBuffer = ArrayBuffer;
   });
 
+  // ── Step 1: Load the loading screen immediately ───────────────
+  console.log("[session] showing loading screen: " + LOADING_URL);
+  await page.goto(LOADING_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
+
+  // ── Step 2: Start streaming the loading animation right away ──
+  var loadingInterval = setInterval(async function() {
+    if (ws.readyState !== 1) { clearInterval(loadingInterval); return; }
+    try {
+      var imageBase64 = await page.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
+      ws.send(JSON.stringify({ image: "data:image/jpeg;base64," + imageBase64 }));
+    } catch(e) {}
+  }, FRAME_MS);
+
+  // ── Step 3: Load the real game in the background ──────────────
+  console.log("[session] loading game in background...");
+
   await page.setRequestInterception(true);
   page.on("request", function(req) {
     var url = req.url();
@@ -99,42 +107,28 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
   });
   page.on("pageerror", function(err) { console.error("[browser] PAGE ERROR: " + err.message); });
 
-  // ── CHANGE 3 of 3 ────────────────────────────────────────────────────
-  // Was: GAME_URL + "?wallet=...&rom=..."
-  // Now: appends rom (filename), core, and id so game.html loads correctly
   var gameUrl = GAME_BASE_URL
     + "?rom="    + encodeURIComponent(romFile)
     + "&core="   + encodeURIComponent(romCore)
     + "&id="     + encodeURIComponent(romId)
     + "&wallet=" + encodeURIComponent(wallet);
-  // ─────────────────────────────────────────────────────────────────────
 
-  console.log("[session] navigating to: " + gameUrl);
+  console.log("[session] navigating to game: " + gameUrl);
   await page.goto(gameUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-  var webglStatus = await page.evaluate(function() {
-    var canvas = document.createElement("canvas");
-    var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) return "WebGL NOT available";
-    return "WebGL OK: " + gl.getParameter(gl.VERSION);
-  });
-  console.log("[session] WebGL check: " + webglStatus);
-
-  var keepalive = setInterval(function() {
-    if (ws.readyState === 1) ws.send(JSON.stringify({ type: "status", message: "Loading emulator..." }));
-  }, 3000);
-
+  // ── Step 4: Wait for emulator canvas ─────────────────────────
   var canvasFound = false;
   try {
     await page.waitForSelector("canvas", { timeout: 60000 });
     canvasFound = true;
-    console.log("[session] canvas found");
+    console.log("[session] canvas found — switching from loading screen to game");
   } catch (e) {
     console.warn("[session] canvas not found within 60s");
     try { await page.screenshot({ path: "/tmp/debug-screenshot.jpg", type: "jpeg", quality: 80 }); } catch (se) {}
   }
 
-  clearInterval(keepalive);
+  // Stop loading screen stream
+  clearInterval(loadingInterval);
 
   if (!canvasFound) {
     ws.send(JSON.stringify({ type: "error", message: "Emulator failed to load" }));
@@ -142,6 +136,7 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
     return;
   }
 
+  // ── Step 5: Click Play and focus ─────────────────────────────
   await new Promise(function(r) { setTimeout(r, 8000); });
 
   var allClickable = await page.evaluate(function() {
@@ -169,9 +164,10 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
   await page.mouse.click(VIEWPORT_W / 2, VIEWPORT_H / 2);
   await new Promise(function(r) { setTimeout(r, 500); });
 
+  // ── Step 6: Audio capture ─────────────────────────────────────
   var ffmpegProc = null;
   try {
-    console.log("[session] starting ffmpeg audio capture from PulseAudio...");
+    console.log("[session] starting ffmpeg audio capture...");
     ffmpegProc = spawn("ffmpeg", [
       "-f", "pulse",
       "-i", "virtual_speaker.monitor",
@@ -186,11 +182,8 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
 
     ffmpegProc.stdout.on("data", function(chunk) {
       if (ws.readyState !== 1) return;
-      try {
-        ws.send(JSON.stringify({ type: "audio", data: chunk.toString("base64") }));
-      } catch (e) {
-        console.warn("[ffmpeg] send error: " + e.message);
-      }
+      try { ws.send(JSON.stringify({ type: "audio", data: chunk.toString("base64") })); }
+      catch (e) { console.warn("[ffmpeg] send error: " + e.message); }
     });
 
     ffmpegProc.stderr.on("data", function(d) {
@@ -200,21 +193,15 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
       }
     });
 
-    ffmpegProc.on("close", function(code) {
-      console.log("[ffmpeg] process exited with code " + code);
-    });
-
-    ffmpegProc.on("error", function(e) {
-      console.warn("[ffmpeg] failed to start: " + e.message);
-    });
-
-    console.log("[session] ffmpeg audio capture started");
+    ffmpegProc.on("close", function(code) { console.log("[ffmpeg] exited code " + code); });
+    ffmpegProc.on("error", function(e) { console.warn("[ffmpeg] failed: " + e.message); });
 
   } catch (e) {
-    console.warn("[session] ffmpeg audio setup failed: " + e.message);
+    console.warn("[session] ffmpeg setup failed: " + e.message);
   }
 
-  console.log("[session] starting frame loop at " + TARGET_FPS + "fps");
+  // ── Step 7: Game frame loop ───────────────────────────────────
+  console.log("[session] starting game frame loop at " + TARGET_FPS + "fps");
 
   var frameInterval = setInterval(async function() {
     if (ws.readyState !== 1) { clearInterval(frameInterval); return; }
@@ -254,9 +241,6 @@ async function destroySession(ws) {
 
 wss.on("connection", async function(ws, req) {
   var url     = new URL(req.url, "http://localhost");
-
-  // Read all params from the WebSocket URL
-  // arcade-b.html sends: ?rom=filename.sfc&core=snes&id=slug&wallet=0xABC
   var romFile = url.searchParams.get("rom")    || "Kaizo Mario (English).sfc";
   var romCore = url.searchParams.get("core")   || "snes";
   var romId   = url.searchParams.get("id")     || url.searchParams.get("rom") || "kaizo-mario-world-1";
@@ -267,7 +251,7 @@ wss.on("connection", async function(ws, req) {
 
   try {
     await createSession(ws, romFile, romCore, romId, wallet);
-    if (sessions.has(ws)) ws.send(JSON.stringify({ type: "status", message: "Emulator running!" }));
+    if (sessions.has(ws)) ws.send(JSON.stringify({ type: "status", message: "" }));
   } catch (e) {
     console.error("[ws] session creation failed: " + e.message);
     ws.send(JSON.stringify({ type: "error", message: "Failed to start: " + e.message }));
@@ -295,5 +279,6 @@ var PORT = process.env.PORT || 8081;
 server.listen(PORT, function() {
   console.log("Puppeteer SNES server on port " + PORT);
   console.log("Base game URL: " + GAME_BASE_URL);
+  console.log("Loading URL: " + LOADING_URL);
   console.log("Streaming: " + TARGET_FPS + "fps JPEG");
 });
