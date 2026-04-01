@@ -1,5 +1,3 @@
-FROM node:18-slim
-
 RUN apt-get update && apt-get install -y \
     chromium \
     libgl1-mesa-dri \
@@ -8,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libgles2-mesa \
     mesa-utils \
     xvfb \
+    pulseaudio \
     fonts-liberation \
     libappindicator3-1 \
     libasound2 \
@@ -28,17 +27,12 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-COPY package.json .
-RUN npm install
-
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV DISPLAY=:99
+ENV PULSE_SERVER=unix:/tmp/pulse/native
 
-COPY . .
-
-EXPOSE 8081
-
-# Start Xvfb virtual display then run server
-CMD Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & sleep 1 && node server-b.js
+# Start Xvfb + PulseAudio then node
+CMD pulseaudio --start --exit-idle-time=-1 && \
+    Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & \
+    sleep 2 && node server-b.js
