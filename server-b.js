@@ -9,14 +9,13 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const GAME_BASE_URL = process.env.GAME_URL    || "https://jdunk4.github.io/ARCADE1/game.html";
-const LOADING_URL   = process.env.LOADING_URL || "https://jdunk4.github.io/ARCADE1/loading.html";
-const TARGET_FPS    = 20;
-const FRAME_MS      = 1000 / TARGET_FPS;
-const VIEWPORT_W    = 512;
-const VIEWPORT_H    = 448;
-
-// How long to show the loading screen before navigating to game (ms)
+const GAME_BASE_URL    = process.env.GAME_URL    || "https://jdunk4.github.io/ARCADE1/game.html";
+const LOADING_URL      = process.env.LOADING_URL || "https://jdunk4.github.io/ARCADE1/loading.html";
+const TARGET_FPS       = 30;
+const FRAME_MS         = 1000 / TARGET_FPS;
+const VIEWPORT_W       = 512;
+const VIEWPORT_H       = 448;
+const JPEG_QUALITY     = 50;
 const LOADING_SCREEN_MS = 20000;
 
 app.use((req, res, next) => {
@@ -71,28 +70,7 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
   const page = await browser.newPage();
   await page.setViewport({ width: VIEWPORT_W, height: VIEWPORT_H });
 
-  // ── Step 1: Show loading screen on the ACTIVE page ────────────
-  // Single page = active tab = canvas renders = screenshots work
-  console.log("[session] showing loading screen: " + LOADING_URL);
-  await page.goto(LOADING_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
-
-  // Stream loading screen for LOADING_SCREEN_MS before navigating
-  var showingLoader = true;
-  var loadingInterval = setInterval(async function() {
-    if (ws.readyState !== 1) { clearInterval(loadingInterval); return; }
-    if (!showingLoader) { clearInterval(loadingInterval); return; }
-    try {
-      var imageBase64 = await page.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
-      if (ws.readyState === 1) ws.send(JSON.stringify({ image: "data:image/jpeg;base64," + imageBase64 }));
-    } catch(e) { clearInterval(loadingInterval); }
-  }, FRAME_MS);
-
-  // Wait for loading screen to play
-  await new Promise(function(r) { setTimeout(r, LOADING_SCREEN_MS); });
-  showingLoader = false;
-  clearInterval(loadingInterval);
-
-  // ── Step 2: Navigate to game (same page = active tab = audio works) ──
+  // ── Set up ALL handlers BEFORE any navigation ─────────────────
   await page.evaluateOnNewDocument(function() {
     Object.defineProperty(window, "crossOriginIsolated", { get: function() { return true; } });
     if (typeof SharedArrayBuffer === "undefined") window.SharedArrayBuffer = ArrayBuffer;
@@ -116,6 +94,25 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
   });
   page.on("pageerror", function(err) { console.error("[browser] PAGE ERROR: " + err.message); });
 
+  // ── Step 1: Show loading screen ───────────────────────────────
+  console.log("[session] showing loading screen: " + LOADING_URL);
+  await page.goto(LOADING_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
+
+  var showingLoader = true;
+  var loadingInterval = setInterval(async function() {
+    if (ws.readyState !== 1) { clearInterval(loadingInterval); return; }
+    if (!showingLoader) { clearInterval(loadingInterval); return; }
+    try {
+      var imageBase64 = await page.screenshot({ type: "jpeg", quality: JPEG_QUALITY, encoding: "base64" });
+      if (ws.readyState === 1) ws.send(JSON.stringify({ image: "data:image/jpeg;base64," + imageBase64 }));
+    } catch(e) { clearInterval(loadingInterval); }
+  }, FRAME_MS);
+
+  await new Promise(function(r) { setTimeout(r, LOADING_SCREEN_MS); });
+  showingLoader = false;
+  clearInterval(loadingInterval);
+
+  // ── Step 2: Navigate to game ──────────────────────────────────
   var gameUrl = GAME_BASE_URL
     + "?rom="    + encodeURIComponent(romFile)
     + "&core="   + encodeURIComponent(romCore)
@@ -124,7 +121,6 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
 
   console.log("[session] navigating to game: " + gameUrl);
 
-  // Stream a keepalive status while game loads
   var keepalive = setInterval(function() {
     if (ws.readyState === 1) ws.send(JSON.stringify({ type: "status", message: "Loading emulator..." }));
   }, 3000);
@@ -216,23 +212,28 @@ async function createSession(ws, romFile, romCore, romId, wallet) {
     console.warn("[session] ffmpeg setup failed: " + e.message);
   }
 
-  // ── Step 6: Game frame loop ───────────────────────────────────
-  console.log("[session] starting frame loop at " + TARGET_FPS + "fps");
+  // ── Step 6: Game frame loop — skip if previous frame still sending ──
+  console.log("[session] starting frame loop at " + TARGET_FPS + "fps, quality=" + JPEG_QUALITY);
 
+  var sendingFrame = false;
   var frameInterval = setInterval(async function() {
     if (ws.readyState !== 1) { clearInterval(frameInterval); return; }
+    if (sendingFrame) return; // skip frame if still encoding/sending last one
+    sendingFrame = true;
     try {
       var canvasEl = await page.$("canvas");
       var imageBase64;
       if (canvasEl) {
-        imageBase64 = await canvasEl.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
+        imageBase64 = await canvasEl.screenshot({ type: "jpeg", quality: JPEG_QUALITY, encoding: "base64" });
       } else {
-        imageBase64 = await page.screenshot({ type: "jpeg", quality: 70, encoding: "base64" });
+        imageBase64 = await page.screenshot({ type: "jpeg", quality: JPEG_QUALITY, encoding: "base64" });
       }
       ws.send(JSON.stringify({ image: "data:image/jpeg;base64," + imageBase64 }), function(err) {
+        sendingFrame = false;
         if (err) console.warn("[session] send error: " + err.message);
       });
     } catch(e) {
+      sendingFrame = false;
       console.error("[session] screenshot failed: " + e.message);
       clearInterval(frameInterval);
       destroySession(ws);
@@ -294,8 +295,9 @@ wss.on("connection", async function(ws, req) {
 var PORT = process.env.PORT || 8081;
 server.listen(PORT, function() {
   console.log("Puppeteer SNES server on port " + PORT);
-  console.log("Base game URL: " + GAME_BASE_URL);
-  console.log("Loading URL:   " + LOADING_URL);
-  console.log("Loading screen duration: " + LOADING_SCREEN_MS + "ms");
-  console.log("Streaming: " + TARGET_FPS + "fps JPEG");
+  console.log("Base game URL:          " + GAME_BASE_URL);
+  console.log("Loading URL:            " + LOADING_URL);
+  console.log("Loading screen duration:" + LOADING_SCREEN_MS + "ms");
+  console.log("Target FPS:             " + TARGET_FPS);
+  console.log("JPEG quality:           " + JPEG_QUALITY);
 });
