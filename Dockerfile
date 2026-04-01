@@ -7,13 +7,13 @@ ENV TZ=UTC
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
+    unzip \
     xvfb \
     x11-utils \
     xdotool \
     ffmpeg \
     pulseaudio \
     pulseaudio-utils \
-    # RetroArch handles both SNES and NES via cores
     retroarch \
     libgtk-3-0 \
     libglu1-mesa \
@@ -25,7 +25,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Download RetroArch cores for SNES and NES ─────────────────────────
-# snes9x core for SNES, nestopia for NES
 RUN mkdir -p /root/.config/retroarch/cores && \
     curl -L "https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip" \
       -o /tmp/snes9x.zip && \
