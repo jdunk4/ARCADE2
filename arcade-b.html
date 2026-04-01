@@ -121,9 +121,15 @@
           }
         });
 
-        audioEl.play().catch(function(e) {
-          console.log("[audio] play blocked: " + e.message);
-        });
+function resumeAudio() {
+  if (!audioInitialized) initAudio();
+  // Play is called here — always after a user gesture
+  if (audioEl) {
+    audioEl.play().catch(function(e) {
+      console.log("[audio] play retry: " + e.message);
+    });
+  }
+}
 
       } catch (e) {
         console.log("[audio] init failed: " + e.message);
