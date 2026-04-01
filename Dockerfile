@@ -15,10 +15,15 @@ RUN apt-get update && apt-get install -y \
     pulseaudio \
     pulseaudio-utils \
     retroarch \
+    # Software rendering (no GPU needed)
+    libgl1-mesa-dri \
+    libgl1-mesa-glx \
+    mesa-utils \
+    libegl1-mesa \
+    libgles2-mesa \
+    # Other libs
     libgtk-3-0 \
     libglu1-mesa \
-    libgl1-mesa-glx \
-    libgl1-mesa-dri \
     libasound2 \
     libpulse0 \
     libsdl2-2.0-0 \
@@ -34,9 +39,9 @@ RUN mkdir -p /root/.config/retroarch/cores && \
     unzip /tmp/nestopia.zip -d /root/.config/retroarch/cores/ && \
     rm /tmp/snes9x.zip /tmp/nestopia.zip
 
-# ── RetroArch config for headless operation ───────────────────────────
+# ── RetroArch config — software renderer, no GPU required ────────────
 RUN mkdir -p /root/.config/retroarch && cat > /root/.config/retroarch/retroarch.cfg << 'EOF'
-video_driver = "gl"
+video_driver = "sdl2"
 audio_driver = "pulse"
 video_fullscreen = "true"
 video_windowed_fullscreen = "false"
@@ -45,6 +50,8 @@ video_window_height = "224"
 video_vsync = "false"
 fps_show = "false"
 menu_driver = "null"
+video_gpu_record = "false"
+video_shared_context = "false"
 EOF
 
 # ── Node.js 20 ─────────────────────────────────────────────────────────
