@@ -9,7 +9,6 @@
   "dependencies": {
     "express": "latest",
     "puppeteer": "latest",
-    "puppeteer-stream": "latest",
     "ws": "latest"
   },
   "engines": {
