@@ -9,7 +9,12 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const GAME_URL = process.env.GAME_URL || "https://jdunk4.github.io/ARCADE1/game.html";
+// ── CHANGE 1 of 3 ──────────────────────────────────────────────────────
+// Was: const GAME_URL = process.env.GAME_URL || "https://...game.html";
+// Now: base URL only — rom, core, id are appended per session
+const GAME_BASE_URL = process.env.GAME_URL || "https://jdunk4.github.io/ARCADE1/game.html";
+// ───────────────────────────────────────────────────────────────────────
+
 const TARGET_FPS = 20;
 const FRAME_MS = 1000 / TARGET_FPS;
 const VIEWPORT_W = 512;
@@ -41,8 +46,12 @@ const KEY_MAP = {
 
 const sessions = new Map();
 
-async function createSession(ws, romId, wallet) {
-  console.log("[session] creating: rom=" + romId + " wallet=" + wallet);
+// ── CHANGE 2 of 3 ──────────────────────────────────────────────────────
+// Was: createSession(ws, romId, wallet)
+// Now: also receives romFile and romCore so game.html loads the right ROM
+async function createSession(ws, romFile, romCore, romId, wallet) {
+// ───────────────────────────────────────────────────────────────────────
+  console.log("[session] creating: rom=" + romFile + " core=" + romCore + " wallet=" + wallet);
 
   const browser = await puppeteer.launch({
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
@@ -90,7 +99,16 @@ async function createSession(ws, romId, wallet) {
   });
   page.on("pageerror", function(err) { console.error("[browser] PAGE ERROR: " + err.message); });
 
-  var gameUrl = GAME_URL + "?wallet=" + encodeURIComponent(wallet) + "&rom=" + encodeURIComponent(romId);
+  // ── CHANGE 3 of 3 ────────────────────────────────────────────────────
+  // Was: GAME_URL + "?wallet=...&rom=..."
+  // Now: appends rom (filename), core, and id so game.html loads correctly
+  var gameUrl = GAME_BASE_URL
+    + "?rom="    + encodeURIComponent(romFile)
+    + "&core="   + encodeURIComponent(romCore)
+    + "&id="     + encodeURIComponent(romId)
+    + "&wallet=" + encodeURIComponent(wallet);
+  // ─────────────────────────────────────────────────────────────────────
+
   console.log("[session] navigating to: " + gameUrl);
   await page.goto(gameUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
 
@@ -235,15 +253,20 @@ async function destroySession(ws) {
 }
 
 wss.on("connection", async function(ws, req) {
-  var url = new URL(req.url, "http://localhost");
-  var romId = url.searchParams.get("rom") || "kaizo-mario-world-1";
-  var wallet = url.searchParams.get("wallet") || "anonymous";
+  var url     = new URL(req.url, "http://localhost");
 
-  console.log("[ws] connected: rom=" + romId + " wallet=" + wallet);
+  // Read all params from the WebSocket URL
+  // arcade-b.html sends: ?rom=filename.sfc&core=snes&id=slug&wallet=0xABC
+  var romFile = url.searchParams.get("rom")    || "Kaizo Mario (English).sfc";
+  var romCore = url.searchParams.get("core")   || "snes";
+  var romId   = url.searchParams.get("id")     || url.searchParams.get("rom") || "kaizo-mario-world-1";
+  var wallet  = url.searchParams.get("wallet") || "anonymous";
+
+  console.log("[ws] connected: rom=" + romFile + " core=" + romCore + " id=" + romId + " wallet=" + wallet);
   ws.send(JSON.stringify({ type: "status", message: "Launching emulator..." }));
 
   try {
-    await createSession(ws, romId, wallet);
+    await createSession(ws, romFile, romCore, romId, wallet);
     if (sessions.has(ws)) ws.send(JSON.stringify({ type: "status", message: "Emulator running!" }));
   } catch (e) {
     console.error("[ws] session creation failed: " + e.message);
@@ -271,5 +294,6 @@ wss.on("connection", async function(ws, req) {
 var PORT = process.env.PORT || 8081;
 server.listen(PORT, function() {
   console.log("Puppeteer SNES server on port " + PORT);
-  console.log("Streaming: " + TARGET_FPS + "fps JPEG from " + GAME_URL);
+  console.log("Base game URL: " + GAME_BASE_URL);
+  console.log("Streaming: " + TARGET_FPS + "fps JPEG");
 });
