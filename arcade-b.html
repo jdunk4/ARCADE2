@@ -6,14 +6,14 @@
 
   <m-image
     id="screen"
-    src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/SMW%20-%20Kaizo%20Mario%20World%201.png"
+    src="PLACEHOLDER_IMAGE_URL_B"
     width="0.88" height="0.77"
     y="1.75" z="0.46">
   </m-image>
 
   <m-cube width="1.1" height="0.35" depth="0.3" y="2.4" z="0.25" color="#e8000d"></m-cube>
-  <m-label content="KAIZO MARIO WORLD" y="2.47" z="0.42" width="1.0" height="0.16" font-size="8" color="#ffffff" alignment="center"></m-label>
-  <m-label content="T. Takemoto" y="2.3" z="0.42" width="1.0" height="0.1" font-size="8" color="#ffcc00" alignment="center"></m-label>
+  <m-label content="A PLUMBER FOR ALL SEASONS" y="2.47" z="0.42" width="1.0" height="0.16" font-size="7" color="#ffffff" alignment="center"></m-label>
+  <m-label content="Hiathor" y="2.3" z="0.42" width="1.0" height="0.1" font-size="8" color="#ffcc00" alignment="center"></m-label>
   <m-cube width="1.15" height="0.03" depth="0.1" y="2.62" z="0.3" color="#ffcc00"></m-cube>
   <m-cube width="1.15" height="0.03" depth="0.1" y="2.22" z="0.3" color="#ffcc00"></m-cube>
   <m-cube width="0.05" height="2.2" depth="0.8" y="1.1" x="-0.625" color="#1a0505"></m-cube>
@@ -29,13 +29,13 @@
   <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="-0.3" color="#150000"></m-cube>
   <m-cube width="0.15" height="0.25" depth="0.02" y="1.3" z="0.42" x="0.3" color="#150000"></m-cube>
   <m-cube width="1.3" height="0.08" depth="0.9" y="0.04" color="#1a0505"></m-cube>
-  <m-label content="EXPERT" y="0.65" z="0.42" width="0.9" height="0.1" font-size="10" color="#ff4400" alignment="center"></m-label>
+  <m-label content="KAIZO" y="0.65" z="0.42" width="0.9" height="0.1" font-size="10" color="#ff4400" alignment="center"></m-label>
   <m-label id="completion-label" content="0 players completed" y="0.52" z="0.42" width="0.9" height="0.1" font-size="10" color="#aaaaff" alignment="center"></m-label>
   <m-label id="status-label" content="" y="0.38" z="0.42" width="0.85" height="0.12" font-size="11" color="#ffff00" alignment="center"></m-label>
 
   <m-image
     id="info-card"
-    src="https://raw.githubusercontent.com/jdunk4/ARCADE2/main/KMW%20-%20Info%20Card.png"
+    src="PLACEHOLDER_IMAGE_URL_B"
     width="1.4" height="1.0"
     x="1.4" y="1.5" z="0.46"
     ry="-15"
@@ -43,7 +43,7 @@
   </m-image>
 
   <m-position-probe range="4.0" id="probe"></m-position-probe>
-  <m-interaction id="play-btn" prompt="Press E to Play Kaizo Mario World" range="4.0" y="1.1"></m-interaction>
+  <m-interaction id="play-btn" prompt="Press E to Play A Plumber for All Seasons" range="4.0" y="1.1"></m-interaction>
 
   <!-- 3D Controller -->
   <m-group id="controller-root" y="0.9" z="0.85">
@@ -70,14 +70,11 @@
 
   <script>
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // CONFIG — only these lines change per cabinet
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    var ROM_FILE  = "Kaizo Mario (English).sfc";
+    var ROM_FILE  = "a-plumber-for-all-seasons_2021-11-22.sfc";
     var ROM_CORE  = "snes";
-    var ROM_ID    = "kaizo-mario-world-1";
-    var ROM_TITLE = "Kaizo Mario World";
-    var ROM_PREVIEW = "https://raw.githubusercontent.com/jdunk4/ARCADE1/main/SMW%20-%20Kaizo%20Mario%20World%201.png";
+    var ROM_ID    = "a-plumber-for-all-seasons";
+    var ROM_TITLE = "A Plumber for All Seasons";
+    var ROM_PREVIEW = "PLACEHOLDER_IMAGE_URL_B";
 
     var SNES_SERVER_WS = "wss://arcade2-production.up.railway.app";
     var BACKEND_SERVER = "https://gamer-production.up.railway.app";
@@ -89,26 +86,20 @@
     }
 
     var socket = null, gameActive = false, controllerConnected = false;
-
-    // ── Audio ──────────────────────────────────────────────────────
     var audioEl = null, mediaSource = null, sourceBuffer = null;
     var audioChunkQueue = [], sbReady = false, audioInitialized = false;
 
     function initAudio() {
-      if (audioInitialized) return;
-      audioInitialized = true;
+      if (audioInitialized) return; audioInitialized = true;
       try {
         if (!window.MediaSource) return;
-        audioEl = new Audio();
-        audioEl.autoplay = true;
+        audioEl = new Audio(); audioEl.autoplay = true;
         mediaSource = new MediaSource();
         audioEl.src = URL.createObjectURL(mediaSource);
         mediaSource.addEventListener("sourceopen", function() {
           try {
             sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
-            sourceBuffer.mode = "sequence";
-            sbReady = true;
-            flushAudioQueue();
+            sourceBuffer.mode = "sequence"; sbReady = true; flushAudioQueue();
           } catch(e) {}
         });
       } catch(e) {}
@@ -118,13 +109,11 @@
 
     function flushAudioQueue() {
       if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
-      // Drop stale chunks if queue is backed up — prevents overlapping audio
       while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
       var chunk = audioChunkQueue.shift();
       try { sourceBuffer.appendBuffer(chunk); } catch(e) { audioChunkQueue = []; return; }
       sourceBuffer.addEventListener("updateend", function onUpdate() {
-        sourceBuffer.removeEventListener("updateend", onUpdate);
-        flushAudioQueue();
+        sourceBuffer.removeEventListener("updateend", onUpdate); flushAudioQueue();
       });
     }
 
@@ -134,17 +123,12 @@
         var binary = atob(base64Data);
         var buf = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
-        audioChunkQueue.push(buf.buffer);
-        flushAudioQueue();
+        audioChunkQueue.push(buf.buffer); flushAudioQueue();
       } catch(e) {}
     }
 
     function unlockAudio() {
-      // Unlock AudioContext on user gesture — required by browsers
-      try {
-        var AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (AudioContext) { var ctx = new AudioContext(); ctx.resume(); }
-      } catch(e) {}
+      try { var AudioContext = window.AudioContext || window.webkitAudioContext; if (AudioContext) { var ctx = new AudioContext(); ctx.resume(); } } catch(e) {}
       resumeAudio();
     }
 
@@ -158,7 +142,6 @@
       audioEl = null; mediaSource = null; sourceBuffer = null;
     }
 
-    // ── Gamepad ────────────────────────────────────────────────────
     var gamepadToSNES = { 0:"b",1:"a",2:"y",3:"x",4:"l",5:"r",8:"select",9:"start",12:"up",13:"down",14:"left",15:"right" };
     var buttonMap = {
       0:{id:"btn-a",color:"#ff5555",pressY:0.095},  1:{id:"btn-b",color:"#44ff88",pressY:0.095},
@@ -204,7 +187,6 @@
     function poll() {
       var gp = getBestGamepad();
       if (gp) {
-        if (!controllerConnected) { controllerConnected = true; }
         gp.buttons.forEach(function(btn, rawIndex) {
           var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
           setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5);
@@ -223,7 +205,6 @@
       requestAnimationFrame(poll);
     }
 
-    // ── WebSocket ──────────────────────────────────────────────────
     function connectToServer() {
       var sessionId = Math.random().toString(36).slice(2);
       var wsUrl = SNES_SERVER_WS
@@ -232,43 +213,27 @@
         + "&id="      + encodeURIComponent(ROM_ID)
         + "&session=" + sessionId
         + "&wallet="  + encodeURIComponent(WALLET);
-
       socket = new WebSocket(wsUrl);
-
       socket.onopen = function() { set("status-label", "content", ""); };
-
       socket.onmessage = function(msg) {
         var frame = JSON.parse(msg.data);
-        if (frame.type === "audio" && frame.data) {
-          resumeAudio();
-          playAudioChunk(frame.data);
-          return;
-        }
+        if (frame.type === "audio" && frame.data) { resumeAudio(); playAudioChunk(frame.data); return; }
         if (frame.type === "status") { set("status-label", "content", frame.message); return; }
         if (frame.type === "error")  { set("status-label", "content", "Error: " + frame.message); return; }
         if (frame.type === "completion") { logCompletion(); return; }
         if (frame.image) {
           set("screen", "src", frame.image);
           set("status-label", "content", "");
-          if (!gameActive) {
-            gameActive = true;
-            set("play-btn", "prompt", "Press E to Close");
-            resumeAudio();
-          }
+          if (!gameActive) { gameActive = true; set("play-btn", "prompt", "Press E to Close"); resumeAudio(); }
         }
       };
-
       socket.onclose = function() {
         gameActive = false; resetAudio();
         set("screen", "src", ROM_PREVIEW);
         set("status-label", "content", "");
         set("play-btn", "prompt", "Press E to Play " + ROM_TITLE);
       };
-
-      socket.onerror = function() {
-        set("status-label", "content", "Connection failed");
-        socket.close();
-      };
+      socket.onerror = function() { set("status-label", "content", "Connection failed"); socket.close(); };
     }
 
     function launchGame() {
@@ -277,10 +242,7 @@
       connectToServer();
     }
 
-    function closeGame() {
-      if (socket) socket.close();
-      gameActive = false; resetAudio();
-    }
+    function closeGame() { if (socket) socket.close(); gameActive = false; resetAudio(); }
 
     function logCompletion() {
       fetch(BACKEND_SERVER + "/complete", {
@@ -301,13 +263,11 @@
     setTimeout(function() {
       poll();
       window.addEventListener("gamepadconnected", function() { poll(); });
-
       var playBtn = document.getElementById("play-btn");
       if (playBtn) playBtn.addEventListener("interact", function() {
-        unlockAudio(); // ← unlock AudioContext on user gesture (press E)
+        unlockAudio();
         if (gameActive) closeGame(); else launchGame();
       });
-
       var probe = document.getElementById("probe");
       if (probe) {
         probe.addEventListener("positionenter", function() { set("info-card", "visible", "true"); });
@@ -316,7 +276,6 @@
           if (gameActive) closeGame();
         });
       }
-
       refreshCompletionCount();
     }, 500);
 
