@@ -188,24 +188,33 @@ async function createWineSession(ws, romId, wallet) {
   ffmpegVideo.on("close", function(code) { console.log("[ffmpeg-video] exited code " + code); });
   ffmpegVideo.on("error", function(e) { console.warn("[ffmpeg-video] failed: " + e.message); });
 
-  // ── Step 4: ffmpeg — audio capture with minimal buffering ─────
-  // Use very small cluster time to reduce audio latency/drift
+  // ── Step 4: ffmpeg — audio capture, ultra low latency ──────────
   var ffmpegAudio = spawn("ffmpeg", [
+    "-fflags", "nobuffer",          // disable input buffering
+    "-flags", "low_delay",          // low delay mode globally
     "-f", "pulse",
+    "-fragment_size", "1024",       // smallest PulseAudio fragment = less input lag
     "-i", "virtual_speaker.monitor",
     "-c:a", "libopus",
-    "-b:a", "64k",
-    "-application", "lowdelay",  // opus low-delay mode
-    "-frame_duration", "20",      // 20ms frames (minimum)
+    "-b:a", "32k",                  // lower bitrate = smaller chunks = less buffering
+    "-application", "lowdelay",
+    "-frame_duration", "20",        // 20ms = minimum opus frame
     "-vn",
     "-f", "webm",
-    "-cluster_size_limit", "256K", // smaller clusters = less buffering
-    "-cluster_time_limit", "40",   // 40ms max cluster = tighter sync
+    "-cluster_size_limit", "32K",   // very small clusters
+    "-cluster_time_limit", "20",    // 20ms max = flush constantly
+    "-flush_packets", "1",          // flush output immediately
     "pipe:1"
-  ], { stdio: ["ignore", "pipe", "pipe"] });
+  ], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: Object.assign({}, process.env, {
+      PULSE_SERVER: process.env.PULSE_SERVER,
+      PULSE_LATENCY_MSEC: "20"        // tell PulseAudio to use 20ms latency
+    })
+  });
 
   // Hard cap on audio queue — drop old chunks aggressively to stay in sync
-  var MAX_WINE_AUDIO_QUEUE = 2;
+  var MAX_WINE_AUDIO_QUEUE = 1;
   var wineAudioQueue = [];
   var sendingAudio = false;
 
