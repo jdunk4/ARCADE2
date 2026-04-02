@@ -41,6 +41,21 @@ app.get("/debug-screenshot.jpg", (req, res) => {
   }
 });
 
+// Full virtual display capture — visit /debug-display.jpg while Wine game is running
+app.get("/debug-display.jpg", function(req, res) {
+  var execSync = require("child_process").execSync;
+  try {
+    execSync("ffmpeg -y -f x11grab -r 1 -s 1024x768 -i :99.0+0,0 -vframes 1 /tmp/debug-display.jpg 2>/dev/null || true");
+    var p = "/tmp/debug-display.jpg";
+    if (fs.existsSync(p)) {
+      res.setHeader("Content-Type", "image/jpeg");
+      res.sendFile(p);
+    } else {
+      res.status(404).send("No display screenshot — is a Wine session running?");
+    }
+  } catch(e) { res.status(500).send("Error: " + e.message); }
+});
+
 // ── Key maps ──────────────────────────────────────────────────────────────────
 
 // For EmulatorJS (Puppeteer) sessions
