@@ -57,7 +57,7 @@ echo "Wine version: $(wine --version 2>/dev/null || echo 'unknown')"
 
 # ── Pokemon Insurgence — download on first boot ───────────────────
 INSURGENCE_DIR="/app/insurgence"
-INSURGENCE_EXE="$INSURGENCE_DIR/Pokemon Insurgence 1.2.7 Core/Game.exe"
+INSURGENCE_EXE="$INSURGENCE_DIR/Insurgence/Pokemon Insurgence 1.2.7 Core/Game.exe"
 INSURGENCE_URL="https://arweave.net/-x_QoDP7rkKE0r8qsum6EB_YqrWEo379ZWTTWqnmz1Q"
 
 if [ ! -f "$INSURGENCE_EXE" ]; then
