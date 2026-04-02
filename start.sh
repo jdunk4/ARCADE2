@@ -58,16 +58,29 @@ echo "Wine version: $(wine --version 2>/dev/null || echo 'unknown')"
 # ── Pokemon Insurgence — download on first boot ───────────────────
 INSURGENCE_DIR="/app/insurgence"
 INSURGENCE_EXE="$INSURGENCE_DIR/Pokemon Insurgence 1.2.7 Core/Game.exe"
-INSURGENCE_URL="https://turbo-gateway.com/-x_QoDP7rkKE0r8qsum6EB_YqrWEo379ZWTTWqnmz1Q"
+INSURGENCE_URL="https://arweave.net/-x_QoDP7rkKE0r8qsum6EB_YqrWEo379ZWTTWqnmz1Q"
 
 if [ ! -f "$INSURGENCE_EXE" ]; then
   echo "=== Downloading Pokemon Insurgence (first boot only) ==="
   mkdir -p "$INSURGENCE_DIR"
-  curl -L "$INSURGENCE_URL" -o /tmp/insurgence.zip
-  echo "=== Download complete, unzipping... ==="
-  unzip -o /tmp/insurgence.zip -d "$INSURGENCE_DIR"
-  rm -f /tmp/insurgence.zip
-  echo "=== Pokemon Insurgence ready at $INSURGENCE_EXE ==="
+  curl -L --max-time 600 "$INSURGENCE_URL" -o /tmp/insurgence.zip
+
+  # Verify download size — must be at least 100MB
+  ZIP_SIZE=$(stat -c%s /tmp/insurgence.zip 2>/dev/null || echo 0)
+  echo "=== Downloaded ${ZIP_SIZE} bytes ==="
+
+  if [ "$ZIP_SIZE" -lt 100000000 ]; then
+    echo "=== ERROR: Download too small (${ZIP_SIZE} bytes) — likely not a valid zip ==="
+    echo "=== File contents: ==="
+    cat /tmp/insurgence.zip
+    rm -f /tmp/insurgence.zip
+    echo "=== Skipping unzip, server will start without Insurgence ==="
+  else
+    echo "=== Download complete, unzipping... ==="
+    unzip -o /tmp/insurgence.zip -d "$INSURGENCE_DIR"
+    rm -f /tmp/insurgence.zip
+    echo "=== Pokemon Insurgence ready at: $INSURGENCE_EXE ==="
+  fi
 else
   echo "=== Pokemon Insurgence already installed, skipping download ==="
 fi
