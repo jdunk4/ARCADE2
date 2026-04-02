@@ -1,4 +1,5 @@
 <m-group>
+
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        GAME SCREEN
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
@@ -23,56 +24,44 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <m-group id="controller-root" y="0.9" z="0.55" rx="-12">
 
-    <!-- Game Boy DMG GLB (cm -> metres via scale 0.1) -->
     <m-model src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/MODELS/gameboy_original.glb" y="4.345" scale="0.1" z="0.924">
     </m-model>
 
-    <!-- D-PAD arms (each lit independently per direction)
-         rest z=0.168 | pressed z=0.150  -->
-    <m-cube id="btn-dpad-up" x="-0.280" y="-0.124" z="0.168" width="0.088" height="0.132" depth="0.024" color="#cccccc" opacity="0.0">
-    </m-cube>
-    <m-cube id="btn-dpad-down" x="-0.280" y="-0.196" z="0.168" width="0.088" height="0.132" depth="0.024" color="#cccccc" opacity="0.0">
-    </m-cube>
-    <m-cube id="btn-dpad-left" x="-0.348" y="-0.160" z="0.168" width="0.132" height="0.088" depth="0.024" color="#cccccc" opacity="0.0">
-    </m-cube>
-    <m-cube id="btn-dpad-right" x="-0.212" y="-0.160" z="0.168" width="0.132" height="0.088" depth="0.024" color="#cccccc" opacity="0.0">
-    </m-cube>
+    <m-cube id="btn-dpad-up"    x="-0.280" y="-0.124" z="0.168" width="0.088" height="0.132" depth="0.024" color="#cccccc" opacity="0.0"></m-cube>
+    <m-cube id="btn-dpad-down"  x="-0.280" y="-0.196" z="0.168" width="0.088" height="0.132" depth="0.024" color="#cccccc" opacity="0.0"></m-cube>
+    <m-cube id="btn-dpad-left"  x="-0.348" y="-0.160" z="0.168" width="0.132" height="0.088" depth="0.024" color="#cccccc" opacity="0.0"></m-cube>
+    <m-cube id="btn-dpad-right" x="-0.212" y="-0.160" z="0.168" width="0.132" height="0.088" depth="0.024" color="#cccccc" opacity="0.0"></m-cube>
 
-    <!-- A / B buttons (magenta circles)
-         B = left, A = right (classic DMG layout)
-         rest z=0.172 | pressed z=0.152  -->
     <m-sphere id="btn-b" x="0.180" y="-0.220" z="0.172" radius="0.072" color="#cc1177" opacity="0.0"></m-sphere>
     <m-sphere id="btn-a" x="0.350" y="-0.140" z="0.172" radius="0.072" color="#cc1177" opacity="0.0"></m-sphere>
-
-    <!-- X/Y map onto A/B visuals (same physical buttons glow again)
-         rest z=0.172 | pressed z=0.152  -->
     <m-sphere id="btn-x" x="0.350" y="-0.140" z="0.172" radius="0.072" color="#5588ff" opacity="0.0"></m-sphere>
     <m-sphere id="btn-y" x="0.180" y="-0.220" z="0.172" radius="0.072" color="#ffee44" opacity="0.0"></m-sphere>
 
-    <!-- SELECT / START (small pill buttons)
-         rest z=0.162 | pressed z=0.144  -->
     <m-cube id="btn-select" x="-0.100" y="-0.390" z="0.162" width="0.145" height="0.052" depth="0.022" color="#8888cc" opacity="0.0"></m-cube>
-    <m-cube id="btn-start" x=" 0.120" y="-0.390" z="0.162" width="0.145" height="0.052" depth="0.022" color="#8888cc" opacity="0.0"></m-cube>
+    <m-cube id="btn-start"  x=" 0.120" y="-0.390" z="0.162" width="0.145" height="0.052" depth="0.022" color="#8888cc" opacity="0.0"></m-cube>
 
-    <!-- SHOULDER BUTTONS (top edge, invisible on DMG but functional)
-         LB/RB rest z=0.130 | pressed z=0.110
-         LT/RT rest z=0.100 | pressed z=0.080  -->
     <m-cube id="btn-lb" x="-0.240" y="0.660" z="0.130" width="0.200" height="0.072" depth="0.060" color="#aa88ff" opacity="0.0"></m-cube>
     <m-cube id="btn-rb" x=" 0.240" y="0.660" z="0.130" width="0.200" height="0.072" depth="0.060" color="#aa88ff" opacity="0.0"></m-cube>
     <m-cube id="btn-lt" x="-0.240" y="0.640" z="0.100" width="0.200" height="0.055" depth="0.080" color="#ff8844" opacity="0.0"></m-cube>
     <m-cube id="btn-rt" x=" 0.240" y="0.640" z="0.100" width="0.200" height="0.055" depth="0.080" color="#ff8844" opacity="0.0"></m-cube>
 
-    <!-- ANALOG STICKS (invisible drift indicators, no physical DMG equivalent) -->
     <m-sphere id="btn-ls" x="-0.160" y="-0.280" z="0.170" radius="0.045" color="#66ddff" opacity="0.0"></m-sphere>
     <m-sphere id="btn-rs" x=" 0.120" y="-0.310" z="0.170" radius="0.045" color="#66ddff" opacity="0.0"></m-sphere>
 
   </m-group>
 
   <script>
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // IIFE — every variable is local to THIS cabinet only.
+  // No globals leak into the shared MML JS context, so audio and
+  // state from Insurgence can never bleed into the Mario cabinets.
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  (function() {
+
     var ROM_FILE = "PokemonInsurgence";
     var ROM_CORE = "wine";
-    var ROM_ID = "pokemon-insurgence";
-    var ROM_TITLE = "Pokemon Insurgence";
+    var ROM_ID   = "pokemon-insurgence";
+    var ROM_TITLE   = "Pokemon Insurgence";
     var ROM_PREVIEW = "PLACEHOLDER_IMAGE_URL_A";
     var SNES_SERVER_WS = "wss://arcade2-production.up.railway.app";
     var BACKEND_SERVER = "https://gamer-production.up.railway.app";
@@ -83,21 +72,17 @@
       if (e) e.setAttribute(attr, val);
     }
 
-    var socket = null,
-      gameActive = false,
-      pollingActive = false;
+    var socket = null, gameActive = false, pollingActive = false;
 
-    // ── AUDIO STATE ─────────────────────────────────────────────────
-    // audioEnabled is the single gate — only true while THIS cabinet's
-    // WebSocket session is live. All audio functions check this first.
+    // ── AUDIO — fully private to this IIFE instance ─────────────────
     var audioEl = null,
-      mediaSource = null,
-      sourceBuffer = null,
-      audioObjectURL = null;
+        mediaSource = null,
+        sourceBuffer = null,
+        audioObjectURL = null;
     var audioChunkQueue = [],
-      sbReady = false,
-      audioInitialized = false,
-      audioEnabled = false;
+        sbReady = false,
+        audioInitialized = false,
+        audioEnabled = false;  // true ONLY while this cabinet's socket is open
 
     function initAudio() {
       if (audioInitialized) return;
@@ -115,25 +100,19 @@
             sourceBuffer.mode = "sequence";
             sbReady = true;
             flushAudioQueue();
-          } catch (e) {}
+          } catch(e) {}
         });
-      } catch (e) {}
+      } catch(e) {}
     }
 
     var MAX_AUDIO_QUEUE = 1;
 
     function flushAudioQueue() {
-      // Hard gate: drop everything if this cabinet is not active
       if (!audioEnabled) { audioChunkQueue = []; return; }
       if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
       while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
       var chunk = audioChunkQueue.shift();
-      try {
-        sourceBuffer.appendBuffer(chunk);
-      } catch (e) {
-        audioChunkQueue = [];
-        return;
-      }
+      try { sourceBuffer.appendBuffer(chunk); } catch(e) { audioChunkQueue = []; return; }
       sourceBuffer.addEventListener("updateend", function onUpdate() {
         sourceBuffer.removeEventListener("updateend", onUpdate);
         flushAudioQueue();
@@ -141,7 +120,6 @@
     }
 
     function playAudioChunk(base64Data) {
-      // Drop chunk immediately if audio not enabled for this cabinet
       if (!audioEnabled) return;
       if (!audioEl || !mediaSource) return;
       try {
@@ -150,40 +128,33 @@
         for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
         audioChunkQueue.push(buf.buffer);
         flushAudioQueue();
-      } catch (e) {}
+      } catch(e) {}
     }
 
     function unlockAudio() {
       try {
         var AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) {
-          var c = new AC();
-          c.resume();
-        }
-      } catch (e) {}
+        if (AC) { var c = new AC(); c.resume(); }
+      } catch(e) {}
       resumeAudio();
     }
 
     function resumeAudio() {
-      // Only init + play if this cabinet is the active one
       if (!audioEnabled) return;
       if (!audioInitialized) initAudio();
       if (audioEl && audioEl.paused) audioEl.play().catch(function() {});
     }
 
     function resetAudio() {
-      // Disable the gate first so any in-flight chunks are dropped immediately
       audioEnabled = false;
       audioChunkQueue = [];
       sbReady = false;
       audioInitialized = false;
-      // Pause and hard-stop the audio element
       if (audioEl) {
-        try { audioEl.pause(); audioEl.src = ""; } catch (e) {}
+        try { audioEl.pause(); audioEl.src = ""; } catch(e) {}
       }
-      // Revoke the object URL so the MediaSource is fully released — no ghost playback
       if (audioObjectURL) {
-        try { URL.revokeObjectURL(audioObjectURL); } catch (e) {}
+        try { URL.revokeObjectURL(audioObjectURL); } catch(e) {}
         audioObjectURL = null;
       }
       audioEl = null;
@@ -192,9 +163,6 @@
     }
 
     // ── BUTTON MAP ──────────────────────────────────────────────────
-    // glowColor: colour overlay flashes on press
-    // restZ:     z at rest (invisible, flush with GLB surface)
-    // pressZ:    z when held (pushes inward ~18mm)
     var buttonMap = {
       0:  { id: "btn-a",          glowColor: "#ff44aa", restZ: 0.172, pressZ: 0.152 },
       1:  { id: "btn-b",          glowColor: "#ff44aa", restZ: 0.172, pressZ: 0.152 },
@@ -215,16 +183,16 @@
     };
 
     var wineKeyMap = {
-      0: "a",  1: "b",  2: "x",  3: "y",
-      4: "l",  5: "r",
-      8: "select", 9: "start",
-      12: "up", 13: "down", 14: "left", 15: "right"
+      0:"a", 1:"b", 2:"x", 3:"y",
+      4:"l", 5:"r",
+      8:"select", 9:"start",
+      12:"up", 13:"down", 14:"left", 15:"right"
     };
     var remapIndex = {
-      0: 1,  1: 0,  2: 3,  3: 2,
-      4: 4,  5: 5,  6: 6,  7: 7,
-      8: 8,  9: 9,  10: 10, 11: 11,
-      12: 12, 13: 13, 14: 14, 15: 15
+      0:1, 1:0, 2:3, 3:2,
+      4:4, 5:5, 6:6, 7:7,
+      8:8, 9:9, 10:10, 11:11,
+      12:12, 13:13, 14:14, 15:15
     };
     var buttonStates = {};
 
@@ -233,9 +201,6 @@
       socket.send(JSON.stringify({ type: type, key: key }));
     }
 
-    // ── BUTTON ANIMATION ────────────────────────────────────────────
-    // Press:   opacity 0.85 + glow color + Z push-in
-    // Release: opacity 0.0 + Z snaps back (GLB always visible underneath)
     function setButtonPressed(rawIndex, di, pressed) {
       var map = buttonMap[di];
       if (!map) return;
@@ -243,15 +208,15 @@
       if (!elem) return;
       if (pressed && !buttonStates[di]) {
         buttonStates[di] = true;
-        elem.setAttribute("color", map.glowColor);
+        elem.setAttribute("color",   map.glowColor);
         elem.setAttribute("opacity", "0.85");
-        elem.setAttribute("z", map.pressZ);
+        elem.setAttribute("z",       map.pressZ);
         var k = wineKeyMap[rawIndex];
         if (k) sendGameInput(k, "keyDown");
       } else if (!pressed && buttonStates[di]) {
         buttonStates[di] = false;
         elem.setAttribute("opacity", "0.0");
-        elem.setAttribute("z", map.restZ);
+        elem.setAttribute("z",       map.restZ);
         var k = wineKeyMap[rawIndex];
         if (k) sendGameInput(k, "keyUp");
       }
@@ -269,7 +234,6 @@
     function poll() {
       if (pollingActive) return;
       pollingActive = true;
-
       function loop() {
         var gp = getBestGamepad();
         if (gp) {
@@ -277,19 +241,11 @@
             var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
             setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5);
           });
-          var axisX = gp.axes[0] || 0,
-            axisY = gp.axes[1] || 0,
-            T = 0.5;
+          var axisX = gp.axes[0] || 0, axisY = gp.axes[1] || 0, T = 0.5;
           var ls = document.getElementById("btn-ls"),
-            rs = document.getElementById("btn-rs");
-          if (ls) {
-            ls.setAttribute("x", -0.160 + axisX * 0.028);
-            ls.setAttribute("y", -0.280 + axisY * 0.028);
-          }
-          if (rs) {
-            rs.setAttribute("x", 0.120 + (gp.axes[2] || 0) * 0.028);
-            rs.setAttribute("y", -0.310 + (gp.axes[3] || 0) * 0.028);
-          }
+              rs = document.getElementById("btn-rs");
+          if (ls) { ls.setAttribute("x", -0.160 + axisX * 0.028); ls.setAttribute("y", -0.280 + axisY * 0.028); }
+          if (rs) { rs.setAttribute("x",  0.120 + (gp.axes[2] || 0) * 0.028); rs.setAttribute("y", -0.310 + (gp.axes[3] || 0) * 0.028); }
           if (!buttonStates[14] && !buttonStates[15] && !buttonStates[12] && !buttonStates[13]) {
             if (axisX < -T) sendGameInput("left", "keyDown");
             else if (axisX > T) sendGameInput("right", "keyDown");
@@ -306,55 +262,42 @@
 
     function connectToServer() {
       var sessionId = Math.random().toString(36).slice(2);
-      var wsUrl = SNES_SERVER_WS +
-        "?rom=" + encodeURIComponent(ROM_FILE) +
-        "&core=" + encodeURIComponent(ROM_CORE) +
-        "&id=" + encodeURIComponent(ROM_ID) +
-        "&session=" + sessionId +
-        "&wallet=" + encodeURIComponent(WALLET);
+      var wsUrl = SNES_SERVER_WS
+        + "?rom="     + encodeURIComponent(ROM_FILE)
+        + "&core="    + encodeURIComponent(ROM_CORE)
+        + "&id="      + encodeURIComponent(ROM_ID)
+        + "&session=" + sessionId
+        + "&wallet="  + encodeURIComponent(WALLET);
       socket = new WebSocket(wsUrl);
 
       socket.onopen = function() {
-        audioEnabled = true; // enable audio ONLY for this cabinet's session
+        audioEnabled = true;
         set("status-label", "content", "");
       };
-
       socket.onmessage = function(msg) {
         var frame = JSON.parse(msg.data);
-        // playAudioChunk already gates on audioEnabled — no resumeAudio() call needed here
-        if (frame.type === "audio" && frame.data) {
-          playAudioChunk(frame.data);
-          return;
-        }
-        if (frame.type === "status") {
-          set("status-label", "content", frame.message);
-          return;
-        }
-        if (frame.type === "error") {
-          set("status-label", "content", "Error: " + frame.message);
-          return;
-        }
+        if (frame.type === "audio" && frame.data) { playAudioChunk(frame.data); return; }
+        if (frame.type === "status") { set("status-label", "content", frame.message); return; }
+        if (frame.type === "error")  { set("status-label", "content", "Error: " + frame.message); return; }
         if (frame.image) {
           set("screen", "src", frame.image);
           set("status-label", "content", "");
           if (!gameActive) {
             gameActive = true;
             set("play-btn", "prompt", "Press E to Close");
-            resumeAudio(); // safe — audioEnabled is true at this point
+            resumeAudio();
           }
         }
       };
-
       socket.onclose = function() {
         gameActive = false;
-        resetAudio(); // sets audioEnabled=false, pauses + revokes audio
+        resetAudio();
         set("screen", "src", ROM_PREVIEW);
         set("status-label", "content", "");
         set("play-btn", "prompt", "Press E to Play " + ROM_TITLE);
       };
-
       socket.onerror = function() {
-        audioEnabled = false; // kill audio immediately on error too
+        audioEnabled = false;
         set("status-label", "content", "Connection failed");
         socket.close();
       };
@@ -394,9 +337,7 @@
       });
       var probe = document.getElementById("probe");
       if (probe) {
-        probe.addEventListener("positionenter", function() {
-          set("info-card", "visible", "true");
-        });
+        probe.addEventListener("positionenter", function() { set("info-card", "visible", "true"); });
         probe.addEventListener("positionleave", function() {
           set("info-card", "visible", "false");
           if (gameActive) closeGame();
@@ -404,6 +345,8 @@
       }
       refreshCompletionCount();
     }, 500);
+
+  })(); // end IIFE
   </script>
 
 </m-group>
