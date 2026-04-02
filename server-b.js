@@ -90,6 +90,11 @@ const sessions = new Map();
 async function createWineSession(ws, romId, wallet) {
   console.log("[wine] creating session: id=" + romId + " wallet=" + wallet);
 
+  // Kill any stale Wine/ffmpeg processes from previous sessions
+  try { require("child_process").execSync("pkill -f 'Game.exe' 2>/dev/null || true"); } catch(e) {}
+  try { require("child_process").execSync("pkill -f 'x11grab' 2>/dev/null || true"); } catch(e) {}
+  await new Promise(function(r) { setTimeout(r, 500); });
+
   ws.send(JSON.stringify({ type: "status", message: "Starting Pokemon Insurgence..." }));
 
   // ── Step 1: Launch Wine process ───────────────────────────────
