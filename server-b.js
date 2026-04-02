@@ -138,7 +138,7 @@ async function createWineSession(ws, romId, wallet) {
     "-f", "x11grab",
     "-r", String(TARGET_FPS),
     "-s", "544x416",  // RPG Maker XP default resolution
-    "-i", DISPLAY + ".0+383,242",     // game window offset on 1024x768 virtual display
+    "-i", DISPLAY + ".0+375,250",     // game window offset on 1024x768 virtual display
     "-vf", "scale=" + VIEWPORT_W + ":" + VIEWPORT_H,
     "-c:v", "mjpeg",
     "-q:v", "5",                       // quality 1=best 31=worst, 5 is good balance
