@@ -1,54 +1,27 @@
 <m-group>
 
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       GLB ARCADE MODEL
-       Tune: ry to rotate, scale to resize, y to raise/lower
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <m-model
     src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/MODELS/ArcadeMachineFinal.glb"
-    y="0"
-    scale="1">
+    y="0" scale="1">
   </m-model>
 
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       GAME SCREEN — overlaid on the GLB screen area
-       Tune: y, z to align with the GLB screen face
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <m-image
-    id="screen"
+  <m-image id="screen"
     src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/SCREEN/A%20Plumber%20for%20all%20Seasons.png"
-    width="1.75" height="1.25"
-    y="2.69" z="0.626" rx="-18">
+    width="1.75" height="1.25" y="2.69" z="0.626" rx="-18">
   </m-image>
 
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       LABELS — overlaid on GLB cabinet front
-       Tune: y, z positions to align with the GLB geometry
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <m-label content="ADVENTURE" y="0.65" z="0.38" width="0.9" height="0.1" font-size="10" color="#ff8c00" alignment="center"></m-label>
   <m-label id="completion-label" content="0 players completed" y="0.52" z="0.38" width="0.9" height="0.1" font-size="10" color="#aaaaff" alignment="center"></m-label>
   <m-label id="status-label" content="" y="0.38" z="0.38" width="0.85" height="0.12" font-size="11" color="#ffff00" alignment="center"></m-label>
 
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       INFO CARD — side mounted, appears on approach
-       Tune: x, y, z, ry to position beside the GLB cabinet
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <m-image
-    id="info-card"
+  <m-image id="info-card"
     src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/INFOCARDs/info-card-b.png"
-    width="1.4" height="2.23"
-    x="1.9" y="2.2" z="1.2"
-    ry="-15"
-    visible="false">
+    width="1.4" height="2.23" x="1.9" y="2.2" z="1.2" ry="-15" visible="false">
   </m-image>
 
   <m-position-probe range="6.0" id="probe"></m-position-probe>
   <m-interaction id="play-btn" prompt="Press E to Play A Plumber for All Seasons" range="4.0" y="1.1"></m-interaction>
 
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       MML CONTROLLER — floated above the GLB control panel
-       Tune: y, z on the m-group to align with the GLB panel surface
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <m-group id="controller-root" y="0.9" z="0.55">
     <m-cube width="0.9" height="0.18" depth="0.42" color="#1a0505" rx="8"></m-cube>
     <m-cube x="-0.38" y="-0.12" z="0.04" width="0.22" height="0.32" depth="0.36" color="#1a0505" rx="12"></m-cube>
@@ -72,25 +45,22 @@
   </m-group>
 
   <script>
+  (function() {
 
-    var ROM_FILE  = "a-plumber-for-all-seasons_2021-11-22.sfc";
-    var ROM_CORE  = "snes";
-    var ROM_ID    = "a-plumber-for-all-seasons";
-    var ROM_TITLE = "A Plumber for All Seasons";
+    var ROM_FILE    = "a-plumber-for-all-seasons_2021-11-22.sfc";
+    var ROM_CORE    = "snes";
+    var ROM_ID      = "a-plumber-for-all-seasons";
+    var ROM_TITLE   = "A Plumber for All Seasons";
     var ROM_PREVIEW = "https://raw.githubusercontent.com/jdunk4/ARCADE1/main/SCREEN/A%20Plumber%20for%20all%20Seasons.png";
-
     var SNES_SERVER_WS = "wss://arcade2-production.up.railway.app";
     var BACKEND_SERVER = "https://gamer-production.up.railway.app";
     var WALLET         = "anonymous";
 
-    function set(id, attr, val) {
-      var e = document.getElementById(id);
-      if (e) e.setAttribute(attr, val);
-    }
+    function set(id, attr, val) { var e = document.getElementById(id); if (e) e.setAttribute(attr, val); }
 
     var socket = null, gameActive = false, pollingActive = false;
-    var audioEl = null, mediaSource = null, sourceBuffer = null;
-    var audioChunkQueue = [], sbReady = false, audioInitialized = false;
+    var audioEl = null, mediaSource = null, sourceBuffer = null, audioObjectURL = null;
+    var audioChunkQueue = [], sbReady = false, audioInitialized = false, audioEnabled = false;
 
     function initAudio() {
       if (audioInitialized) return; audioInitialized = true;
@@ -98,12 +68,10 @@
         if (!window.MediaSource) return;
         audioEl = new Audio(); audioEl.autoplay = true;
         mediaSource = new MediaSource();
-        audioEl.src = URL.createObjectURL(mediaSource);
+        audioObjectURL = URL.createObjectURL(mediaSource);
+        audioEl.src = audioObjectURL;
         mediaSource.addEventListener("sourceopen", function() {
-          try {
-            sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
-            sourceBuffer.mode = "sequence"; sbReady = true; flushAudioQueue();
-          } catch(e) {}
+          try { sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"'); sourceBuffer.mode = "sequence"; sbReady = true; flushAudioQueue(); } catch(e) {}
         });
       } catch(e) {}
     }
@@ -111,37 +79,37 @@
     var MAX_AUDIO_QUEUE = 3;
 
     function flushAudioQueue() {
+      if (!audioEnabled) { audioChunkQueue = []; return; }
       if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
       while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
       var chunk = audioChunkQueue.shift();
       try { sourceBuffer.appendBuffer(chunk); } catch(e) { audioChunkQueue = []; return; }
-      sourceBuffer.addEventListener("updateend", function onUpdate() {
-        sourceBuffer.removeEventListener("updateend", onUpdate); flushAudioQueue();
-      });
+      sourceBuffer.addEventListener("updateend", function onUpdate() { sourceBuffer.removeEventListener("updateend", onUpdate); flushAudioQueue(); });
     }
 
     function playAudioChunk(base64Data) {
+      if (!audioEnabled) return;
       if (!audioEl || !mediaSource) return;
       try {
-        var binary = atob(base64Data);
-        var buf = new Uint8Array(binary.length);
+        var binary = atob(base64Data); var buf = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
         audioChunkQueue.push(buf.buffer); flushAudioQueue();
       } catch(e) {}
     }
 
     function unlockAudio() {
-      try { var AudioContext = window.AudioContext || window.webkitAudioContext; if (AudioContext) { var ctx = new AudioContext(); ctx.resume(); } } catch(e) {}
+      try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) { var c = new AC(); c.resume(); } } catch(e) {}
       resumeAudio();
     }
-
     function resumeAudio() {
+      if (!audioEnabled) return;
       if (!audioInitialized) initAudio();
       if (audioEl && audioEl.paused) audioEl.play().catch(function() {});
     }
-
     function resetAudio() {
-      audioChunkQueue = []; sbReady = false; audioInitialized = false;
+      audioEnabled = false; audioChunkQueue = []; sbReady = false; audioInitialized = false;
+      if (audioEl) { try { audioEl.pause(); audioEl.src = ""; } catch(e) {} }
+      if (audioObjectURL) { try { URL.revokeObjectURL(audioObjectURL); } catch(e) {} audioObjectURL = null; }
       audioEl = null; mediaSource = null; sourceBuffer = null;
     }
 
@@ -161,21 +129,16 @@
     var remapIndex = {0:1,1:0,2:3,3:2,4:4,5:5,6:6,7:7,8:8,9:9,10:10,11:11,12:12,13:13,14:14,15:15};
     var buttonStates = {};
 
-    function sendGameInput(key, type) {
-      if (!gameActive || !socket || socket.readyState !== 1) return;
-      socket.send(JSON.stringify({ type: type, key: key }));
-    }
+    function sendGameInput(key, type) { if (!gameActive || !socket || socket.readyState !== 1) return; socket.send(JSON.stringify({ type: type, key: key })); }
 
     function setButtonPressed(rawIndex, di, pressed) {
       var map = buttonMap[di]; if (!map) return;
       var elem = document.getElementById(map.id); if (!elem) return;
       if (pressed && !buttonStates[di]) {
-        buttonStates[di] = true;
-        elem.setAttribute("color", map.color); elem.setAttribute("y", map.pressY);
+        buttonStates[di] = true; elem.setAttribute("color", map.color); elem.setAttribute("y", map.pressY);
         var k = gamepadToSNES[rawIndex]; if (k) sendGameInput(k, "keyDown");
       } else if (!pressed && buttonStates[di]) {
-        buttonStates[di] = false;
-        elem.setAttribute("color", defaultColors[di] || "#3a3a5c"); elem.setAttribute("y", defaultY[di]);
+        buttonStates[di] = false; elem.setAttribute("color", defaultColors[di] || "#3a3a5c"); elem.setAttribute("y", defaultY[di]);
         var k = gamepadToSNES[rawIndex]; if (k) sendGameInput(k, "keyUp");
       }
     }
@@ -188,24 +151,18 @@
     }
 
     function poll() {
-      if (pollingActive) return;
-      pollingActive = true;
+      if (pollingActive) return; pollingActive = true;
       function loop() {
         var gp = getBestGamepad();
         if (gp) {
-          gp.buttons.forEach(function(btn, rawIndex) {
-            var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
-            setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5);
-          });
+          gp.buttons.forEach(function(btn, rawIndex) { var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex; setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5); });
           var axisX = gp.axes[0]||0, axisY = gp.axes[1]||0, T = 0.5;
           var ls = document.getElementById("btn-ls"), rs = document.getElementById("btn-rs");
           if (ls) { ls.setAttribute("x", -0.18 + axisX*0.04); ls.setAttribute("z", 0.06 + axisY*0.04); }
           if (rs) { rs.setAttribute("x", 0.18 + (gp.axes[2]||0)*0.04); rs.setAttribute("z", 0.08 + (gp.axes[3]||0)*0.04); }
           if (!buttonStates[14] && !buttonStates[15] && !buttonStates[12] && !buttonStates[13]) {
-            if (axisX < -T) sendGameInput("left","keyDown"); else if (axisX > T) sendGameInput("right","keyDown");
-            else { sendGameInput("left","keyUp"); sendGameInput("right","keyUp"); }
-            if (axisY < -T) sendGameInput("up","keyDown"); else if (axisY > T) sendGameInput("down","keyDown");
-            else { sendGameInput("up","keyUp"); sendGameInput("down","keyUp"); }
+            if (axisX < -T) sendGameInput("left","keyDown"); else if (axisX > T) sendGameInput("right","keyDown"); else { sendGameInput("left","keyUp"); sendGameInput("right","keyUp"); }
+            if (axisY < -T) sendGameInput("up","keyDown"); else if (axisY > T) sendGameInput("down","keyDown"); else { sendGameInput("up","keyUp"); sendGameInput("down","keyUp"); }
           }
         }
         requestAnimationFrame(loop);
@@ -215,78 +172,48 @@
 
     function connectToServer() {
       var sessionId = Math.random().toString(36).slice(2);
-      var wsUrl = SNES_SERVER_WS
-        + "?rom="     + encodeURIComponent(ROM_FILE)
-        + "&core="    + encodeURIComponent(ROM_CORE)
-        + "&id="      + encodeURIComponent(ROM_ID)
-        + "&session=" + sessionId
-        + "&wallet="  + encodeURIComponent(WALLET);
+      var wsUrl = SNES_SERVER_WS + "?rom=" + encodeURIComponent(ROM_FILE) + "&core=" + encodeURIComponent(ROM_CORE) + "&id=" + encodeURIComponent(ROM_ID) + "&session=" + sessionId + "&wallet=" + encodeURIComponent(WALLET);
       socket = new WebSocket(wsUrl);
-      socket.onopen = function() { set("status-label", "content", ""); };
+      socket.onopen = function() { audioEnabled = true; set("status-label", "content", ""); };
       socket.onmessage = function(msg) {
         var frame = JSON.parse(msg.data);
-        if (frame.type === "audio" && frame.data) { resumeAudio(); playAudioChunk(frame.data); return; }
+        if (frame.type === "audio" && frame.data) { playAudioChunk(frame.data); return; }
         if (frame.type === "status") { set("status-label", "content", frame.message); return; }
         if (frame.type === "error")  { set("status-label", "content", "Error: " + frame.message); return; }
         if (frame.type === "completion") { logCompletion(); return; }
-        if (frame.image) {
-          set("screen", "src", frame.image);
-          set("status-label", "content", "");
-          if (!gameActive) { gameActive = true; set("play-btn", "prompt", "Press E to Close"); resumeAudio(); }
-        }
+        if (frame.image) { set("screen", "src", frame.image); set("status-label", "content", ""); if (!gameActive) { gameActive = true; set("play-btn", "prompt", "Press E to Close"); resumeAudio(); } }
       };
-      socket.onclose = function() {
-        gameActive = false; resetAudio();
-        set("screen", "src", ROM_PREVIEW);
-        set("status-label", "content", "");
-        set("play-btn", "prompt", "Press E to Play " + ROM_TITLE);
-      };
-      socket.onerror = function() { set("status-label", "content", "Connection failed"); socket.close(); };
+      socket.onclose = function() { gameActive = false; resetAudio(); set("screen", "src", ROM_PREVIEW); set("status-label", "content", ""); set("play-btn", "prompt", "Press E to Play " + ROM_TITLE); };
+      socket.onerror = function() { audioEnabled = false; set("status-label", "content", "Connection failed"); socket.close(); };
     }
 
-    function launchGame() {
-      set("status-label", "content", "Launching emulator...");
-      set("play-btn", "prompt", "Launching...");
-      connectToServer();
-    }
-
+    function launchGame() { set("status-label", "content", "Launching emulator..."); set("play-btn", "prompt", "Launching..."); connectToServer(); }
     function closeGame() { if (socket) socket.close(); gameActive = false; resetAudio(); }
 
     function logCompletion() {
-      fetch(BACKEND_SERVER + "/complete", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: WALLET, rom: ROM_ID })
-      }).then(function() { refreshCompletionCount(); }).catch(function(){});
+      fetch(BACKEND_SERVER + "/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: WALLET, rom: ROM_ID }) })
+        .then(function() { refreshCompletionCount(); }).catch(function(){});
     }
-
     function refreshCompletionCount() {
-      fetch(BACKEND_SERVER + "/completions/" + ROM_ID)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var count = data.count || 0;
-          set("completion-label", "content", count + " player" + (count !== 1 ? "s" : "") + " completed");
-        }).catch(function(){});
+      fetch(BACKEND_SERVER + "/completions/" + ROM_ID).then(function(r) { return r.json(); }).then(function(data) {
+        var count = data.count || 0; set("completion-label", "content", count + " player" + (count !== 1 ? "s" : "") + " completed");
+      }).catch(function(){});
     }
 
     setTimeout(function() {
       poll();
       window.addEventListener("gamepadconnected", function() { if (!pollingActive) poll(); });
       var playBtn = document.getElementById("play-btn");
-      if (playBtn) playBtn.addEventListener("interact", function() {
-        unlockAudio();
-        if (gameActive) closeGame(); else launchGame();
-      });
+      if (playBtn) playBtn.addEventListener("interact", function() { unlockAudio(); if (gameActive) closeGame(); else launchGame(); });
       var probe = document.getElementById("probe");
       if (probe) {
         probe.addEventListener("positionenter", function() { set("info-card", "visible", "true"); });
-        probe.addEventListener("positionleave", function() {
-          set("info-card", "visible", "false");
-          if (gameActive) closeGame();
-        });
+        probe.addEventListener("positionleave", function() { set("info-card", "visible", "false"); if (gameActive) closeGame(); });
       }
       refreshCompletionCount();
     }, 500);
 
+  })();
   </script>
 
 </m-group>
