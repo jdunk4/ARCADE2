@@ -61,78 +61,6 @@
     function set(id, attr, val) { var e = document.getElementById(id); if (e) e.setAttribute(attr, val); }
 
     var socket = null, gameActive = false, pollingActive = false;
-    var audioEl = null, mediaSource = null, sourceBuffer = null, audioObjectURL = null;
-    var audioChunkQueue = [], sbReady = false, audioInitialized = false, audioEnabled = false;
-
-    function initAudio() {
-      if (audioInitialized) return;
-      audioInitialized = true;
-      try {
-        if (!window.MediaSource) return;
-        audioEl = new Audio();
-        audioEl.autoplay = true;
-        mediaSource = new MediaSource();
-        audioObjectURL = URL.createObjectURL(mediaSource);
-        audioEl.src = audioObjectURL;
-        mediaSource.addEventListener("sourceopen", function() {
-          try {
-            sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
-            sourceBuffer.mode = "sequence";
-            sbReady = true;
-            flushAudioQueue(); // flush anything that queued up while MediaSource was opening
-          } catch(e) {}
-        });
-      } catch(e) {}
-    }
-
-    var MAX_AUDIO_QUEUE = 1;
-
-    function flushAudioQueue() {
-      if (!audioEnabled) { audioChunkQueue = []; return; }
-      if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
-      while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
-      var chunk = audioChunkQueue.shift();
-      try { sourceBuffer.appendBuffer(chunk); } catch(e) { audioChunkQueue = []; return; }
-      sourceBuffer.addEventListener("updateend", function onUpdate() {
-        sourceBuffer.removeEventListener("updateend", onUpdate);
-        flushAudioQueue();
-      });
-    }
-
-    function playAudioChunk(base64Data) {
-      if (!audioEnabled) return;
-      if (!audioEl || !mediaSource) return;
-      try {
-        var binary = atob(base64Data);
-        var buf = new Uint8Array(binary.length);
-        for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
-        audioChunkQueue.push(buf.buffer);
-        flushAudioQueue();
-      } catch(e) {}
-    }
-
-    function unlockAudio() {
-      try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) { var c = new AC(); c.resume(); } } catch(e) {}
-      resumeAudio();
-    }
-
-    function resumeAudio() {
-      if (!audioEnabled) return;
-      if (!audioInitialized) initAudio();
-      if (audioEl && audioEl.paused) audioEl.play().catch(function() {});
-    }
-
-    function resetAudio() {
-      audioEnabled = false;
-      audioChunkQueue = [];
-      sbReady = false;
-      audioInitialized = false;
-      if (audioEl) { try { audioEl.pause(); audioEl.src = ""; } catch(e) {} }
-      if (audioObjectURL) { try { URL.revokeObjectURL(audioObjectURL); } catch(e) {} audioObjectURL = null; }
-      audioEl = null;
-      mediaSource = null;
-      sourceBuffer = null;
-    }
 
     var buttonMap = {
       0:  { id: "btn-a",          glowColor: "#ff44aa", restZ: 0.172, pressZ: 0.152 },
@@ -222,18 +150,13 @@
       socket = new WebSocket(wsUrl);
 
       socket.onopen = function() {
-        audioEnabled = true;   // gate opens — this cabinet owns audio now
-        initAudio();           // start warming up MediaSource immediately
         set("status-label", "content", "");
       };
 
       socket.onmessage = function(msg) {
         var frame = JSON.parse(msg.data);
-        if (frame.type === "audio" && frame.data) {
-          // chunks queue up inside playAudioChunk; flushAudioQueue drains once sbReady=true
-          playAudioChunk(frame.data);
-          return;
-        }
+        // audio frames are silently ignored — no audio for this cabinet
+        if (frame.type === "audio") return;
         if (frame.type === "status") { set("status-label", "content", frame.message); return; }
         if (frame.type === "error")  { set("status-label", "content", "Error: " + frame.message); return; }
         if (frame.image) {
@@ -242,21 +165,18 @@
           if (!gameActive) {
             gameActive = true;
             set("play-btn", "prompt", "Press E to Close");
-            resumeAudio(); // ensure audioEl.play() is called after user gesture
           }
         }
       };
 
       socket.onclose = function() {
         gameActive = false;
-        resetAudio();
         set("screen", "src", ROM_PREVIEW);
         set("status-label", "content", "");
         set("play-btn", "prompt", "Press E to Play " + ROM_TITLE);
       };
 
       socket.onerror = function() {
-        audioEnabled = false;
         set("status-label", "content", "Connection failed");
         socket.close();
       };
@@ -271,7 +191,6 @@
     function closeGame() {
       if (socket) socket.close();
       gameActive = false;
-      resetAudio();
     }
 
     function refreshCompletionCount() {
@@ -288,7 +207,6 @@
       window.addEventListener("gamepadconnected", function() { if (!pollingActive) poll(); });
       var playBtn = document.getElementById("play-btn");
       if (playBtn) playBtn.addEventListener("interact", function() {
-        unlockAudio();
         if (gameActive) closeGame(); else launchGame();
       });
       var probe = document.getElementById("probe");
