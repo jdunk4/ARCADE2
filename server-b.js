@@ -188,79 +188,20 @@ async function createWineSession(ws, romId, wallet) {
   ffmpegVideo.on("close", function(code) { console.log("[ffmpeg-video] exited code " + code); });
   ffmpegVideo.on("error", function(e) { console.warn("[ffmpeg-video] failed: " + e.message); });
 
-  // ── Step 4: ffmpeg — audio capture, ultra low latency ──────────
-  var ffmpegAudio = spawn("ffmpeg", [
-    "-fflags", "nobuffer",          // disable input buffering
-    "-flags", "low_delay",          // low delay mode globally
-    "-f", "pulse",
-    "-fragment_size", "1024",       // smallest PulseAudio fragment = less input lag
-    "-i", "virtual_speaker.monitor",
-    "-c:a", "libopus",
-    "-b:a", "32k",                  // lower bitrate = smaller chunks = less buffering
-    "-application", "lowdelay",
-    "-frame_duration", "20",        // 20ms = minimum opus frame
-    "-vn",
-    "-f", "webm",
-    "-cluster_size_limit", "32K",   // very small clusters
-    "-cluster_time_limit", "20",    // 20ms max = flush constantly
-    "-flush_packets", "1",          // flush output immediately
-    "pipe:1"
-  ], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: Object.assign({}, process.env, {
-      PULSE_SERVER: process.env.PULSE_SERVER,
-      PULSE_LATENCY_MSEC: "20"        // tell PulseAudio to use 20ms latency
-    })
-  });
 
-  // Hard cap on audio queue — drop old chunks aggressively to stay in sync
-  var MAX_WINE_AUDIO_QUEUE = 1;
-  var wineAudioQueue = [];
-  var sendingAudio = false;
-
-  function flushWineAudio() {
-    if (sendingAudio || wineAudioQueue.length === 0) return;
-    // Drop stale chunks if backed up
-    while (wineAudioQueue.length > MAX_WINE_AUDIO_QUEUE) {
-      wineAudioQueue.shift();
-      console.log("[wine-audio] dropped stale chunk");
-    }
-    sendingAudio = true;
-    var chunk = wineAudioQueue.shift();
-    try {
-      ws.send(JSON.stringify({ type: "audio", data: chunk }), function() {
-        sendingAudio = false;
-        flushWineAudio();
-      });
-    } catch(e) {
-      sendingAudio = false;
-      console.warn("[wine-audio] send error: " + e.message);
-    }
-  }
-
-  ffmpegAudio.stdout.on("data", function(chunk) {
-    if (ws.readyState !== 1) return;
-    wineAudioQueue.push(chunk.toString("base64"));
-    flushWineAudio();
-  });
-  ffmpegAudio.stderr.on("data", function(d) {
-    var line = d.toString().trim();
-    if (line.includes("Stream") || line.includes("Error") || line.includes("error")) {
-      console.log("[ffmpeg-audio] " + line);
-    }
-  });
-  ffmpegAudio.on("close", function(code) { console.log("[ffmpeg-audio] exited code " + code); });
-  ffmpegAudio.on("error", function(e) { console.warn("[ffmpeg-audio] failed: " + e.message); });
+  // Audio handled by m-audio element in MML world — no streaming needed
+  console.log("[wine] audio handled by world m-audio element");
 
   // Store wine session — no browser/page, just processes
   sessions.set(ws, {
     type: "wine",
     wineProc,
     ffmpegVideo,
-    ffmpegAudio,
-    frameInterval: null, // not used for wine sessions
+    ffmpegAudio: null,
+    frameInterval: null,
     wallet,
     romId
+  });
   });
 
   ws.send(JSON.stringify({ type: "status", message: "" }));
@@ -465,9 +406,13 @@ async function destroySession(ws) {
   if (!session) return;
 
   if (session.type === "wine") {
-    try { if (session.ffmpegVideo) session.ffmpegVideo.kill("SIGTERM"); } catch(e) {}
-    try { if (session.ffmpegAudio) session.ffmpegAudio.kill("SIGTERM"); } catch(e) {}
-    try { if (session.wineProc)    session.wineProc.kill("SIGTERM");    } catch(e) {}
+    try { if (session.ffmpegVideo) session.ffmpegVideo.kill("SIGKILL"); } catch(e) {}
+    try { if (session.ffmpegAudio) session.ffmpegAudio.kill("SIGKILL"); } catch(e) {}
+    try { if (session.wineProc)    session.wineProc.kill("SIGKILL");    } catch(e) {}
+    // Force kill any stray processes to prevent audio bleed into other games
+    try { require("child_process").execSync("pkill -9 -f x11grab 2>/dev/null || true"); } catch(e) {}
+    try { require("child_process").execSync("pkill -9 -f Game.exe 2>/dev/null || true"); } catch(e) {}
+    try { require("child_process").execSync("pkill -9 -f wineserver 2>/dev/null || true"); } catch(e) {}
   } else {
     clearInterval(session.frameInterval);
     try { if (session.ffmpegProc) session.ffmpegProc.kill("SIGTERM"); } catch(e) {}
