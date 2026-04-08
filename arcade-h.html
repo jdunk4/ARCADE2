@@ -1,13 +1,9 @@
 <m-group>
 
-  <m-model
-    src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/MODELS/ArcadeMachineFinal2.glb"
-    y="0" scale="1">
+  <m-model src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/MODELS/ArcadeMachineFinal2.glb" y="0" scale="1">
   </m-model>
 
-  <m-image id="screen"
-    src="https://raw.githubusercontent.com/jdunk4/ARCADE2/main/NSMW1-12MagicOrbs.png"
-    width="1.75" height="1.25" y="2.69" z="0.626" rx="-18">
+  <m-image id="screen" src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/SCREEN/NSMW1-12MagicOrbs.png" width="1.75" height="1.25" y="2.69" z="0.626" rx="-18">
   </m-image>
 
   <m-label content="HACK" y="0.65" z="0.38" width="0.9" height="0.1" font-size="10" color="#ff8c00" alignment="center"></m-label>
@@ -18,12 +14,8 @@
        INFO CARD — click to open game in browser
        m-interaction child turns the card itself into a clickable button
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <m-image id="info-card"
-    src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/INFOCARDs/info-card-h.png"
-    width="1.4" height="2.23" x="1.9" y="2.2" z="1.2" ry="-15" visible="false">
-    <m-interaction id="card-link-btn"
-      prompt="🌐 Open in browser"
-      range="3.5">
+  <m-image id="info-card" src="https://raw.githubusercontent.com/jdunk4/ARCADE1/main/INFOCARDs/info-card-h.png" width="1.4" height="2.23" x="1.9" y="2.2" z="1.2" ry="-15" visible="false">
+    <m-interaction id="card-link-btn" prompt="🌐 Open in browser" range="3.5">
     </m-interaction>
   </m-image>
 
@@ -37,296 +29,517 @@
     <m-cube width="0.9" height="0.18" depth="0.42" color="#1a0505" rx="8"></m-cube>
     <m-cube x="-0.38" y="-0.12" z="0.04" width="0.22" height="0.32" depth="0.36" color="#1a0505" rx="12"></m-cube>
     <m-cube x="0.38" y="-0.12" z="0.04" width="0.22" height="0.32" depth="0.36" color="#1a0505" rx="12"></m-cube>
-    <m-cube id="btn-dpad-up"    x="-0.3"  y="0.095" z="-0.04" width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
-    <m-cube id="btn-dpad-down"  x="-0.3"  y="0.095" z="0.06"  width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
-    <m-cube id="btn-dpad-left"  x="-0.36" y="0.095" z="0.01"  width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
-    <m-cube id="btn-dpad-right" x="-0.24" y="0.095" z="0.01"  width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
-    <m-sphere id="btn-a"      x="0.36"  y="0.11" z="0.0"  radius="0.038" color="#cc2222"></m-sphere>
-    <m-sphere id="btn-b"      x="0.30"  y="0.11" z="0.06" radius="0.038" color="#1aaa5c"></m-sphere>
-    <m-sphere id="btn-x"      x="0.3"   y="0.11" z="-0.06" radius="0.038" color="#2244cc"></m-sphere>
-    <m-sphere id="btn-y"      x="0.24"  y="0.11" z="0.0"  radius="0.038" color="#ccaa00"></m-sphere>
-    <m-cube id="btn-lb"     x="-0.38" y="0.12" z="-0.16" width="0.2" height="0.04" depth="0.08" color="#2a2a4a"></m-cube>
-    <m-cube id="btn-rb"     x="0.38"  y="0.12" z="-0.16" width="0.2" height="0.04" depth="0.08" color="#2a2a4a"></m-cube>
-    <m-cube id="btn-lt"     x="-0.38" y="0.16" z="-0.22" width="0.2" height="0.05" depth="0.1"  color="#2a2a4a"></m-cube>
-    <m-cube id="btn-rt"     x="0.38"  y="0.16" z="-0.22" width="0.2" height="0.05" depth="0.1"  color="#2a2a4a"></m-cube>
+    <m-cube id="btn-dpad-up" x="-0.3" y="0.095" z="-0.04" width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
+    <m-cube id="btn-dpad-down" x="-0.3" y="0.095" z="0.06" width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
+    <m-cube id="btn-dpad-left" x="-0.36" y="0.095" z="0.01" width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
+    <m-cube id="btn-dpad-right" x="-0.24" y="0.095" z="0.01" width="0.06" height="0.01" depth="0.06" color="#3a3a5c"></m-cube>
+    <m-sphere id="btn-a" x="0.36" y="0.11" z="0.0" radius="0.038" color="#cc2222"></m-sphere>
+    <m-sphere id="btn-b" x="0.30" y="0.11" z="0.06" radius="0.038" color="#1aaa5c"></m-sphere>
+    <m-sphere id="btn-x" x="0.3" y="0.11" z="-0.06" radius="0.038" color="#2244cc"></m-sphere>
+    <m-sphere id="btn-y" x="0.24" y="0.11" z="0.0" radius="0.038" color="#ccaa00"></m-sphere>
+    <m-cube id="btn-lb" x="-0.38" y="0.12" z="-0.16" width="0.2" height="0.04" depth="0.08" color="#2a2a4a"></m-cube>
+    <m-cube id="btn-rb" x="0.38" y="0.12" z="-0.16" width="0.2" height="0.04" depth="0.08" color="#2a2a4a"></m-cube>
+    <m-cube id="btn-lt" x="-0.38" y="0.16" z="-0.22" width="0.2" height="0.05" depth="0.1" color="#2a2a4a"></m-cube>
+    <m-cube id="btn-rt" x="0.38" y="0.16" z="-0.22" width="0.2" height="0.05" depth="0.1" color="#2a2a4a"></m-cube>
     <m-sphere id="btn-select" x="-0.1" y="0.1" z="-0.02" radius="0.025" color="#3a3a5c"></m-sphere>
-    <m-sphere id="btn-start"  x="0.1"  y="0.1" z="-0.02" radius="0.025" color="#3a3a5c"></m-sphere>
-    <m-sphere id="btn-ls"   x="-0.18" y="0.1" z="0.06" radius="0.055" color="#2a2a4a"></m-sphere>
-    <m-sphere id="btn-rs"   x="0.18"  y="0.1" z="0.08" radius="0.055" color="#2a2a4a"></m-sphere>
+    <m-sphere id="btn-start" x="0.1" y="0.1" z="-0.02" radius="0.025" color="#3a3a5c"></m-sphere>
+    <m-sphere id="btn-ls" x="-0.18" y="0.1" z="0.06" radius="0.055" color="#2a2a4a"></m-sphere>
+    <m-sphere id="btn-rs" x="0.18" y="0.1" z="0.08" radius="0.055" color="#2a2a4a"></m-sphere>
   </m-group>
 
   <script>
-  (function(root) {
-    var ROM_FILE    = "New Super Mario World 2 Around The World.sfc";
-    var ROM_CORE    = "snes";
-    var ROM_ID      = "new-super-mario-world-2-around-the-world";
-    var ROM_TITLE   = "New Super Mario World 2 Around The World";
-    var ROM_PREVIEW = "https://raw.githubusercontent.com/jdunk4/ARCADE2/main/NSMW2-Preview.png";
-    var GAME_BASE   = "https://jdunk4.github.io/ARCADE2/game.html";
-    var SNES_SERVER_WS = "wss://arcade2-production.up.railway.app";
-    var BACKEND_SERVER = "https://gamer-production.up.railway.app";
-    var WALLET = "anonymous";
+    (function(root) {
+      var ROM_FILE = "New Super Mario World 2 Around The World.sfc";
+      var ROM_CORE = "snes";
+      var ROM_ID = "new-super-mario-world-2-around-the-world";
+      var ROM_TITLE = "New Super Mario World 2 Around The World";
+      var ROM_PREVIEW = "https://raw.githubusercontent.com/jdunk4/ARCADE2/main/NSMW2-Preview.png";
+      var GAME_BASE = "https://jdunk4.github.io/ARCADE2/game.html";
+      var SNES_SERVER_WS = "wss://arcade2-production.up.railway.app";
+      var BACKEND_SERVER = "https://gamer-production.up.railway.app";
+      var WALLET = "anonymous";
 
-    function set(id, attr, val) {
-      var e = root.querySelector("#" + id);
-      if (e) e.setAttribute(attr, val);
-    }
-
-    function getGameUrl() {
-      return GAME_BASE
-        + "?rom="    + encodeURIComponent(ROM_FILE)
-        + "&core="   + encodeURIComponent(ROM_CORE)
-        + "&id="     + encodeURIComponent(ROM_ID)
-        + "&wallet=" + encodeURIComponent(WALLET);
-    }
-
-    var socket = null, gameActive = false, pollingActive = false;
-    var audioEl = null, mediaSource = null, sourceBuffer = null, audioObjectURL = null;
-    var audioChunkQueue = [], sbReady = false, audioInitialized = false, audioEnabled = false;
-
-    function initAudio() {
-      if (audioInitialized) return;
-      audioInitialized = true;
-      try {
-        if (!window.MediaSource) return;
-        audioEl = new Audio();
-        audioEl.autoplay = true;
-        mediaSource = new MediaSource();
-        audioObjectURL = URL.createObjectURL(mediaSource);
-        audioEl.src = audioObjectURL;
-        mediaSource.addEventListener("sourceopen", function() {
-          try {
-            sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
-            sourceBuffer.mode = "sequence";
-            sbReady = true;
-            flushAudioQueue();
-          } catch(e) {}
-        });
-      } catch(e) {}
-    }
-
-    var MAX_AUDIO_QUEUE = 3;
-    function flushAudioQueue() {
-      if (!audioEnabled) { audioChunkQueue = []; return; }
-      if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
-      while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
-      var chunk = audioChunkQueue.shift();
-      try { sourceBuffer.appendBuffer(chunk); } catch(e) { audioChunkQueue = []; return; }
-      sourceBuffer.addEventListener("updateend", function onUpdate() {
-        sourceBuffer.removeEventListener("updateend", onUpdate);
-        flushAudioQueue();
-      });
-    }
-
-    function playAudioChunk(base64Data) {
-      if (!audioEnabled || !audioEl || !mediaSource) return;
-      try {
-        var binary = atob(base64Data);
-        var buf = new Uint8Array(binary.length);
-        for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
-        audioChunkQueue.push(buf.buffer);
-        flushAudioQueue();
-      } catch(e) {}
-    }
-
-    function unlockAudio() {
-      try {
-        var AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) { var c = new AC(); c.resume(); }
-      } catch(e) {}
-      resumeAudio();
-    }
-
-    function resumeAudio() {
-      if (!audioEnabled) return;
-      if (!audioInitialized) initAudio();
-      if (audioEl && audioEl.paused) audioEl.play().catch(function() {});
-    }
-
-    function resetAudio() {
-      audioEnabled = false; audioChunkQueue = []; sbReady = false; audioInitialized = false;
-      if (audioEl) { try { audioEl.pause(); audioEl.src = ""; } catch(e) {} }
-      if (audioObjectURL) { try { URL.revokeObjectURL(audioObjectURL); } catch(e) {} audioObjectURL = null; }
-      audioEl = null; mediaSource = null; sourceBuffer = null;
-    }
-
-    var gamepadToSNES = { 0:"b",1:"a",2:"y",3:"x",4:"l",5:"r",8:"select",9:"start",12:"up",13:"down",14:"left",15:"right" };
-    var buttonMap = {
-      0:{id:"btn-a",   color:"#ff5555",pressY:0.095}, 1:{id:"btn-b",  color:"#44ff88",pressY:0.095},
-      2:{id:"btn-x",   color:"#5588ff",pressY:0.095}, 3:{id:"btn-y",  color:"#ffee44",pressY:0.095},
-      4:{id:"btn-lb",  color:"#8877ff",pressY:0.10},  5:{id:"btn-rb", color:"#8877ff",pressY:0.10},
-      6:{id:"btn-lt",  color:"#ff8844",pressY:0.14},  7:{id:"btn-rt", color:"#ff8844",pressY:0.14},
-      8:{id:"btn-select",color:"#aaaaff",pressY:0.085},9:{id:"btn-start",color:"#aaaaff",pressY:0.085},
-      10:{id:"btn-ls", color:"#66ddff",pressY:0.085}, 11:{id:"btn-rs",color:"#66ddff",pressY:0.085},
-      12:{id:"btn-dpad-up",color:"#ffffff",pressY:0.08},  13:{id:"btn-dpad-down",color:"#ffffff",pressY:0.08},
-      14:{id:"btn-dpad-left",color:"#ffffff",pressY:0.08},15:{id:"btn-dpad-right",color:"#ffffff",pressY:0.08}
-    };
-    var defaultColors = {
-      0:"#cc2222",1:"#1aaa5c",2:"#2244cc",3:"#ccaa00",4:"#2a2a4a",5:"#2a2a4a",
-      6:"#2a2a4a",7:"#2a2a4a",8:"#3a3a5c",9:"#3a3a5c",10:"#2a2a4a",11:"#2a2a4a",
-      12:"#3a3a5c",13:"#3a3a5c",14:"#3a3a5c",15:"#3a3a5c"
-    };
-    var defaultY = {
-      0:0.11,1:0.11,2:0.11,3:0.11,4:0.12,5:0.12,6:0.16,7:0.16,
-      8:0.1,9:0.1,10:0.1,11:0.1,12:0.095,13:0.095,14:0.095,15:0.095
-    };
-    var remapIndex = {0:1,1:0,2:3,3:2,4:4,5:5,6:6,7:7,8:8,9:9,10:10,11:11,12:12,13:13,14:14,15:15};
-    var buttonStates = {};
-
-    function sendGameInput(key, type) {
-      if (!gameActive || !socket || socket.readyState !== 1) return;
-      socket.send(JSON.stringify({ type: type, key: key }));
-    }
-
-    function setButtonPressed(rawIndex, di, pressed) {
-      var map = buttonMap[di]; if (!map) return;
-      var elem = root.querySelector("#" + map.id); if (!elem) return;
-      if (pressed && !buttonStates[di]) {
-        buttonStates[di] = true;
-        elem.setAttribute("color", map.color);
-        elem.setAttribute("y", map.pressY);
-        var k = gamepadToSNES[rawIndex]; if (k) sendGameInput(k, "keyDown");
-      } else if (!pressed && buttonStates[di]) {
-        buttonStates[di] = false;
-        elem.setAttribute("color", defaultColors[di] || "#3a3a5c");
-        elem.setAttribute("y", defaultY[di]);
-        var k = gamepadToSNES[rawIndex]; if (k) sendGameInput(k, "keyUp");
+      function set(id, attr, val) {
+        var e = root.querySelector("#" + id);
+        if (e) e.setAttribute(attr, val);
       }
-    }
 
-    function getBestGamepad() {
-      var gps = navigator.getGamepads ? navigator.getGamepads() : [];
-      for (var i = 0; i < gps.length; i++) if (gps[i] && gps[i].mapping === "standard") return gps[i];
-      for (var j = 0; j < gps.length; j++) if (gps[j]) return gps[j];
-      return null;
-    }
-
-    function poll() {
-      if (pollingActive) return;
-      pollingActive = true;
-      function loop() {
-        var gp = getBestGamepad();
-        if (gp) {
-          gp.buttons.forEach(function(btn, rawIndex) {
-            var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
-            setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5);
-          });
-          var axisX = gp.axes[0]||0, axisY = gp.axes[1]||0, T = 0.5;
-          var ls = root.querySelector("#btn-ls"), rs = root.querySelector("#btn-rs");
-          if (ls) { ls.setAttribute("x", -0.18 + axisX*0.04); ls.setAttribute("z", 0.06 + axisY*0.04); }
-          if (rs) { rs.setAttribute("x", 0.18 + (gp.axes[2]||0)*0.04); rs.setAttribute("z", 0.08 + (gp.axes[3]||0)*0.04); }
-          if (!buttonStates[14] && !buttonStates[15] && !buttonStates[12] && !buttonStates[13]) {
-            if (axisX < -T) sendGameInput("left","keyDown");
-            else if (axisX > T) sendGameInput("right","keyDown");
-            else { sendGameInput("left","keyUp"); sendGameInput("right","keyUp"); }
-            if (axisY < -T) sendGameInput("up","keyDown");
-            else if (axisY > T) sendGameInput("down","keyDown");
-            else { sendGameInput("up","keyUp"); sendGameInput("down","keyUp"); }
-          }
-        }
-        requestAnimationFrame(loop);
+      function getGameUrl() {
+        return GAME_BASE +
+          "?rom=" + encodeURIComponent(ROM_FILE) +
+          "&core=" + encodeURIComponent(ROM_CORE) +
+          "&id=" + encodeURIComponent(ROM_ID) +
+          "&wallet=" + encodeURIComponent(WALLET);
       }
-      loop();
-    }
 
-    function connectToServer() {
-      var sessionId = Math.random().toString(36).slice(2);
-      var wsUrl = SNES_SERVER_WS
-        + "?rom="     + encodeURIComponent(ROM_FILE)
-        + "&core="    + encodeURIComponent(ROM_CORE)
-        + "&id="      + encodeURIComponent(ROM_ID)
-        + "&session=" + sessionId
-        + "&wallet="  + encodeURIComponent(WALLET);
-      socket = new WebSocket(wsUrl);
-      socket.onopen = function() { set("status-label", "content", ""); };
-      socket.onmessage = function(msg) {
-        var frame = JSON.parse(msg.data);
-        if (frame.type === "audio" && frame.data) { playAudioChunk(frame.data); return; }
-        if (frame.type === "status") { set("status-label", "content", frame.message); return; }
-        if (frame.type === "error")  { set("status-label", "content", "Error: " + frame.message); return; }
-        if (frame.type === "completion") { logCompletion(); return; }
-        if (frame.image) {
-          set("screen", "src", frame.image);
-          set("status-label", "content", "");
-          if (!gameActive) {
-            gameActive = true;
-            set("play-btn", "prompt", "Press E to Close");
-            resumeAudio();
-          }
-        }
-      };
-      socket.onclose = function() {
-        gameActive = false; resetAudio();
-        set("screen", "src", ROM_PREVIEW);
-        set("status-label", "content", "");
-        set("play-btn", "prompt", "Press E to Play " + ROM_TITLE);
-      };
-      socket.onerror = function() {
+      var socket = null,
+        gameActive = false,
+        pollingActive = false;
+      var audioEl = null,
+        mediaSource = null,
+        sourceBuffer = null,
+        audioObjectURL = null;
+      var audioChunkQueue = [],
+        sbReady = false,
+        audioInitialized = false,
         audioEnabled = false;
-        set("status-label", "content", "Connection failed");
-        socket.close();
-      };
-    }
 
-    function launchGame() {
-      resetAudio(); audioEnabled = true; initAudio();
-      set("status-label", "content", "Launching emulator...");
-      set("play-btn", "prompt", "Launching...");
-      connectToServer();
-    }
+      function initAudio() {
+        if (audioInitialized) return;
+        audioInitialized = true;
+        try {
+          if (!window.MediaSource) return;
+          audioEl = new Audio();
+          audioEl.autoplay = true;
+          mediaSource = new MediaSource();
+          audioObjectURL = URL.createObjectURL(mediaSource);
+          audioEl.src = audioObjectURL;
+          mediaSource.addEventListener("sourceopen", function() {
+            try {
+              sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs="opus"');
+              sourceBuffer.mode = "sequence";
+              sbReady = true;
+              flushAudioQueue();
+            } catch (e) {}
+          });
+        } catch (e) {}
+      }
 
-    function closeGame() {
-      if (socket) socket.close();
-      gameActive = false; resetAudio();
-    }
+      var MAX_AUDIO_QUEUE = 3;
 
-    function logCompletion() {
-      fetch(BACKEND_SERVER + "/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: WALLET, rom: ROM_ID })
-      }).then(function() { refreshCompletionCount(); }).catch(function(){});
-    }
-
-    function refreshCompletionCount() {
-      fetch(BACKEND_SERVER + "/completions/" + ROM_ID)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var count = data.count || 0;
-          set("completion-label", "content", count + " player" + (count !== 1 ? "s" : "") + " completed");
-        }).catch(function(){});
-    }
-
-    setTimeout(function() {
-      poll();
-      window.addEventListener("gamepadconnected", function() { if (!pollingActive) poll(); });
-
-      // ── Main play button ──────────────────────────────────────
-      var playBtn = root.querySelector("#play-btn");
-      if (playBtn) playBtn.addEventListener("interact", function() {
-        unlockAudio();
-        if (gameActive) closeGame(); else launchGame();
-      });
-
-      // ── Info card click → open game in browser ────────────────
-      var cardBtn = root.querySelector("#card-link-btn");
-      if (cardBtn) cardBtn.addEventListener("interact", function() {
-        window.open(getGameUrl(), "_blank");
-      });
-
-      // ── Proximity probe ───────────────────────────────────────
-      var probe = root.querySelector("#probe");
-      if (probe) {
-        probe.addEventListener("positionenter", function() { set("info-card", "visible", "true"); });
-        probe.addEventListener("positionleave", function() {
-          set("info-card", "visible", "false");
-          if (gameActive) closeGame();
+      function flushAudioQueue() {
+        if (!audioEnabled) {
+          audioChunkQueue = [];
+          return;
+        }
+        if (!sbReady || !sourceBuffer || sourceBuffer.updating || audioChunkQueue.length === 0) return;
+        while (audioChunkQueue.length > MAX_AUDIO_QUEUE) audioChunkQueue.shift();
+        var chunk = audioChunkQueue.shift();
+        try {
+          sourceBuffer.appendBuffer(chunk);
+        } catch (e) {
+          audioChunkQueue = [];
+          return;
+        }
+        sourceBuffer.addEventListener("updateend", function onUpdate() {
+          sourceBuffer.removeEventListener("updateend", onUpdate);
+          flushAudioQueue();
         });
       }
 
-      refreshCompletionCount();
-    }, 500);
-  })(document.currentScript ? document.currentScript.closest("m-group") : document);
+      function playAudioChunk(base64Data) {
+        if (!audioEnabled || !audioEl || !mediaSource) return;
+        try {
+          var binary = atob(base64Data);
+          var buf = new Uint8Array(binary.length);
+          for (var i = 0; i < binary.length; i++) buf[i] = binary.charCodeAt(i);
+          audioChunkQueue.push(buf.buffer);
+          flushAudioQueue();
+        } catch (e) {}
+      }
+
+      function unlockAudio() {
+        try {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) {
+            var c = new AC();
+            c.resume();
+          }
+        } catch (e) {}
+        resumeAudio();
+      }
+
+      function resumeAudio() {
+        if (!audioEnabled) return;
+        if (!audioInitialized) initAudio();
+        if (audioEl && audioEl.paused) audioEl.play().catch(function() {});
+      }
+
+      function resetAudio() {
+        audioEnabled = false;
+        audioChunkQueue = [];
+        sbReady = false;
+        audioInitialized = false;
+        if (audioEl) {
+          try {
+            audioEl.pause();
+            audioEl.src = "";
+          } catch (e) {}
+        }
+        if (audioObjectURL) {
+          try {
+            URL.revokeObjectURL(audioObjectURL);
+          } catch (e) {}
+          audioObjectURL = null;
+        }
+        audioEl = null;
+        mediaSource = null;
+        sourceBuffer = null;
+      }
+
+      var gamepadToSNES = {
+        0: "b",
+        1: "a",
+        2: "y",
+        3: "x",
+        4: "l",
+        5: "r",
+        8: "select",
+        9: "start",
+        12: "up",
+        13: "down",
+        14: "left",
+        15: "right"
+      };
+      var buttonMap = {
+        0: {
+          id: "btn-a",
+          color: "#ff5555",
+          pressY: 0.095
+        },
+        1: {
+          id: "btn-b",
+          color: "#44ff88",
+          pressY: 0.095
+        },
+        2: {
+          id: "btn-x",
+          color: "#5588ff",
+          pressY: 0.095
+        },
+        3: {
+          id: "btn-y",
+          color: "#ffee44",
+          pressY: 0.095
+        },
+        4: {
+          id: "btn-lb",
+          color: "#8877ff",
+          pressY: 0.10
+        },
+        5: {
+          id: "btn-rb",
+          color: "#8877ff",
+          pressY: 0.10
+        },
+        6: {
+          id: "btn-lt",
+          color: "#ff8844",
+          pressY: 0.14
+        },
+        7: {
+          id: "btn-rt",
+          color: "#ff8844",
+          pressY: 0.14
+        },
+        8: {
+          id: "btn-select",
+          color: "#aaaaff",
+          pressY: 0.085
+        },
+        9: {
+          id: "btn-start",
+          color: "#aaaaff",
+          pressY: 0.085
+        },
+        10: {
+          id: "btn-ls",
+          color: "#66ddff",
+          pressY: 0.085
+        },
+        11: {
+          id: "btn-rs",
+          color: "#66ddff",
+          pressY: 0.085
+        },
+        12: {
+          id: "btn-dpad-up",
+          color: "#ffffff",
+          pressY: 0.08
+        },
+        13: {
+          id: "btn-dpad-down",
+          color: "#ffffff",
+          pressY: 0.08
+        },
+        14: {
+          id: "btn-dpad-left",
+          color: "#ffffff",
+          pressY: 0.08
+        },
+        15: {
+          id: "btn-dpad-right",
+          color: "#ffffff",
+          pressY: 0.08
+        }
+      };
+      var defaultColors = {
+        0: "#cc2222",
+        1: "#1aaa5c",
+        2: "#2244cc",
+        3: "#ccaa00",
+        4: "#2a2a4a",
+        5: "#2a2a4a",
+        6: "#2a2a4a",
+        7: "#2a2a4a",
+        8: "#3a3a5c",
+        9: "#3a3a5c",
+        10: "#2a2a4a",
+        11: "#2a2a4a",
+        12: "#3a3a5c",
+        13: "#3a3a5c",
+        14: "#3a3a5c",
+        15: "#3a3a5c"
+      };
+      var defaultY = {
+        0: 0.11,
+        1: 0.11,
+        2: 0.11,
+        3: 0.11,
+        4: 0.12,
+        5: 0.12,
+        6: 0.16,
+        7: 0.16,
+        8: 0.1,
+        9: 0.1,
+        10: 0.1,
+        11: 0.1,
+        12: 0.095,
+        13: 0.095,
+        14: 0.095,
+        15: 0.095
+      };
+      var remapIndex = {
+        0: 1,
+        1: 0,
+        2: 3,
+        3: 2,
+        4: 4,
+        5: 5,
+        6: 6,
+        7: 7,
+        8: 8,
+        9: 9,
+        10: 10,
+        11: 11,
+        12: 12,
+        13: 13,
+        14: 14,
+        15: 15
+      };
+      var buttonStates = {};
+
+      function sendGameInput(key, type) {
+        if (!gameActive || !socket || socket.readyState !== 1) return;
+        socket.send(JSON.stringify({
+          type: type,
+          key: key
+        }));
+      }
+
+      function setButtonPressed(rawIndex, di, pressed) {
+        var map = buttonMap[di];
+        if (!map) return;
+        var elem = root.querySelector("#" + map.id);
+        if (!elem) return;
+        if (pressed && !buttonStates[di]) {
+          buttonStates[di] = true;
+          elem.setAttribute("color", map.color);
+          elem.setAttribute("y", map.pressY);
+          var k = gamepadToSNES[rawIndex];
+          if (k) sendGameInput(k, "keyDown");
+        } else if (!pressed && buttonStates[di]) {
+          buttonStates[di] = false;
+          elem.setAttribute("color", defaultColors[di] || "#3a3a5c");
+          elem.setAttribute("y", defaultY[di]);
+          var k = gamepadToSNES[rawIndex];
+          if (k) sendGameInput(k, "keyUp");
+        }
+      }
+
+      function getBestGamepad() {
+        var gps = navigator.getGamepads ? navigator.getGamepads() : [];
+        for (var i = 0; i < gps.length; i++)
+          if (gps[i] && gps[i].mapping === "standard") return gps[i];
+        for (var j = 0; j < gps.length; j++)
+          if (gps[j]) return gps[j];
+        return null;
+      }
+
+      function poll() {
+        if (pollingActive) return;
+        pollingActive = true;
+
+        function loop() {
+          var gp = getBestGamepad();
+          if (gp) {
+            gp.buttons.forEach(function(btn, rawIndex) {
+              var di = remapIndex.hasOwnProperty(rawIndex) ? remapIndex[rawIndex] : rawIndex;
+              setButtonPressed(rawIndex, di, btn.pressed || btn.value > 0.5);
+            });
+            var axisX = gp.axes[0] || 0,
+              axisY = gp.axes[1] || 0,
+              T = 0.5;
+            var ls = root.querySelector("#btn-ls"),
+              rs = root.querySelector("#btn-rs");
+            if (ls) {
+              ls.setAttribute("x", -0.18 + axisX * 0.04);
+              ls.setAttribute("z", 0.06 + axisY * 0.04);
+            }
+            if (rs) {
+              rs.setAttribute("x", 0.18 + (gp.axes[2] || 0) * 0.04);
+              rs.setAttribute("z", 0.08 + (gp.axes[3] || 0) * 0.04);
+            }
+            if (!buttonStates[14] && !buttonStates[15] && !buttonStates[12] && !buttonStates[13]) {
+              if (axisX < -T) sendGameInput("left", "keyDown");
+              else if (axisX > T) sendGameInput("right", "keyDown");
+              else {
+                sendGameInput("left", "keyUp");
+                sendGameInput("right", "keyUp");
+              }
+              if (axisY < -T) sendGameInput("up", "keyDown");
+              else if (axisY > T) sendGameInput("down", "keyDown");
+              else {
+                sendGameInput("up", "keyUp");
+                sendGameInput("down", "keyUp");
+              }
+            }
+          }
+          requestAnimationFrame(loop);
+        }
+        loop();
+      }
+
+      function connectToServer() {
+        var sessionId = Math.random().toString(36).slice(2);
+        var wsUrl = SNES_SERVER_WS +
+          "?rom=" + encodeURIComponent(ROM_FILE) +
+          "&core=" + encodeURIComponent(ROM_CORE) +
+          "&id=" + encodeURIComponent(ROM_ID) +
+          "&session=" + sessionId +
+          "&wallet=" + encodeURIComponent(WALLET);
+        socket = new WebSocket(wsUrl);
+        socket.onopen = function() {
+          set("status-label", "content", "");
+        };
+        socket.onmessage = function(msg) {
+          var frame = JSON.parse(msg.data);
+          if (frame.type === "audio" && frame.data) {
+            playAudioChunk(frame.data);
+            return;
+          }
+          if (frame.type === "status") {
+            set("status-label", "content", frame.message);
+            return;
+          }
+          if (frame.type === "error") {
+            set("status-label", "content", "Error: " + frame.message);
+            return;
+          }
+          if (frame.type === "completion") {
+            logCompletion();
+            return;
+          }
+          if (frame.image) {
+            set("screen", "src", frame.image);
+            set("status-label", "content", "");
+            if (!gameActive) {
+              gameActive = true;
+              set("play-btn", "prompt", "Press E to Close");
+              resumeAudio();
+            }
+          }
+        };
+        socket.onclose = function() {
+          gameActive = false;
+          resetAudio();
+          set("screen", "src", ROM_PREVIEW);
+          set("status-label", "content", "");
+          set("play-btn", "prompt", "Press E to Play " + ROM_TITLE);
+        };
+        socket.onerror = function() {
+          audioEnabled = false;
+          set("status-label", "content", "Connection failed");
+          socket.close();
+        };
+      }
+
+      function launchGame() {
+        resetAudio();
+        audioEnabled = true;
+        initAudio();
+        set("status-label", "content", "Launching emulator...");
+        set("play-btn", "prompt", "Launching...");
+        connectToServer();
+      }
+
+      function closeGame() {
+        if (socket) socket.close();
+        gameActive = false;
+        resetAudio();
+      }
+
+      function logCompletion() {
+        fetch(BACKEND_SERVER + "/complete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            wallet: WALLET,
+            rom: ROM_ID
+          })
+        }).then(function() {
+          refreshCompletionCount();
+        }).catch(function() {});
+      }
+
+      function refreshCompletionCount() {
+        fetch(BACKEND_SERVER + "/completions/" + ROM_ID)
+          .then(function(r) {
+            return r.json();
+          })
+          .then(function(data) {
+            var count = data.count || 0;
+            set("completion-label", "content", count + " player" + (count !== 1 ? "s" : "") + " completed");
+          }).catch(function() {});
+      }
+
+      setTimeout(function() {
+        poll();
+        window.addEventListener("gamepadconnected", function() {
+          if (!pollingActive) poll();
+        });
+
+        // ── Main play button ──────────────────────────────────────
+        var playBtn = root.querySelector("#play-btn");
+        if (playBtn) playBtn.addEventListener("interact", function() {
+          unlockAudio();
+          if (gameActive) closeGame();
+          else launchGame();
+        });
+
+        // ── Info card click → open game in browser ────────────────
+        var cardBtn = root.querySelector("#card-link-btn");
+        if (cardBtn) cardBtn.addEventListener("interact", function() {
+          window.open(getGameUrl(), "_blank");
+        });
+
+        // ── Proximity probe ───────────────────────────────────────
+        var probe = root.querySelector("#probe");
+        if (probe) {
+          probe.addEventListener("positionenter", function() {
+            set("info-card", "visible", "true");
+          });
+          probe.addEventListener("positionleave", function() {
+            set("info-card", "visible", "false");
+            if (gameActive) closeGame();
+          });
+        }
+
+        refreshCompletionCount();
+      }, 500);
+    })(document.currentScript ? document.currentScript.closest("m-group") : document);
   </script>
 
 </m-group>
