@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SNES9x Broadcaster</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a; color: #eee; font-family: monospace;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px; gap: 16px; min-height: 100vh;
+  }
+  h1 { font-size: 20px; color: #FFD700; letter-spacing: 0.05em; }
+  .card {
+    background: #1a1a1a; border: 1px solid #333; border-radius: 10px;
+    padding: 16px 20px; width: 100%; max-width: 600px;
+  }
+  label { font-size: 12px; color: #888; display: block; margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 8px 10px; background: #111; border: 1px solid #444;
+    border-radius: 6px; color: #eee; font-family: monospace; font-size: 13px;
+  }
+  .row { display: flex; gap: 10px; align-items: flex-end; }
+  .row > div { flex: 1; }
+  button {
+    padding: 10px 20px; border-radius: 8px; border: none;
+    font-size: 14px; font-weight: bold; cursor: pointer; transition: opacity 0.15s;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #start-btn { background: #22cc66; color: #000; width: 100%; margin-top: 12px; }
+  #stop-btn  { background: #cc2222; color: #fff; width: 100%; margin-top: 8px; display: none; }
+  #status {
+    font-size: 13px; padding: 10px 14px; border-radius: 8px; background: #111;
+    border: 1px solid #333; width: 100%; max-width: 600px; min-height: 40px; color: #aaffaa;
+  }
+  #status.error { color: #ff6666; }
+  #status.warn  { color: #ffcc44; }
+  #preview-wrap {
+    width: 100%; max-width: 600px; background: #000; border: 1px solid #333;
+    border-radius: 8px; overflow: hidden; display: none; position: relative;
+  }
+  #preview { width: 100%; display: block; }
+  #viewer-count {
+    position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7);
+    color: #FFD700; font-size: 12px; padding: 4px 10px; border-radius: 20px;
+  }
+  canvas { display: none; }
+  .hint { font-size: 11px; color: #555; text-align: center; max-width: 600px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>🎮 SNES9x → OtherSide Broadcaster</h1>
+
+<div class="card">
+  <div class="row">
+    <div>
+      <label>Railway Server URL (wss://)</label>
+      <input id="server-url" type="text"
+        value="wss://arcade2-production.up.railway.app"
+        placeholder="wss://your-server.up.railway.app">
+    </div>
+    <div>
+      <label>Channel ID</label>
+      <input id="channel-id" type="text" value="snes-live" placeholder="snes-live">
+    </div>
+  </div>
+  <div style="margin-top:10px">
+    <label>FPS (frames per second)</label>
+    <input id="fps" type="number" value="20" min="5" max="30" style="width:80px">
+  </div>
+  <button id="start-btn" onclick="startBroadcast()">▶ Start Broadcasting</button>
+  <button id="stop-btn"  onclick="stopBroadcast()">■ Stop Broadcasting</button>
+</div>
+
+<div id="status">Ready — click Start Broadcasting to begin.</div>
+
+<div id="preview-wrap">
+  <img id="preview" alt="Live preview">
+  <div id="viewer-count">0 viewers</div>
+</div>
+
+<canvas id="capture-canvas"></canvas>
+
+<p class="hint">
+  When you click Start, your browser will ask you to pick a window or screen to share.<br>
+  Select your SNES9x window. Frames will stream to your OtherSide world in real time.
+</p>
+
+<script>
+  var socket = null;
+  var mediaStream = null;
+  var captureInterval = null;
+
+  var videoEl = document.createElement("video");
+  videoEl.autoplay = true;
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+
+  var canvas = document.getElementById("capture-canvas");
+  var ctx = canvas.getContext("2d");
+  var preview = document.getElementById("preview");
+  var previewWrap = document.getElementById("preview-wrap");
+  var statusEl = document.getElementById("status");
+  var viewerCountEl = document.getElementById("viewer-count");
+
+  function setStatus(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className = type || "";
+  }
+
+  function setViewerCount(n) {
+    viewerCountEl.textContent = n + " viewer" + (n !== 1 ? "s" : "");
+  }
+
+  async function startBroadcast() {
+    var serverUrl = document.getElementById("server-url").value.trim();
+    var channelId = document.getElementById("channel-id").value.trim();
+    var fps = parseInt(document.getElementById("fps").value) || 20;
+
+    if (!serverUrl || !channelId) {
+      setStatus("Please fill in server URL and channel ID.", "error");
+      return;
+    }
+
+    // Step 1: Request screen capture
+    setStatus("Requesting screen capture permission...", "warn");
+    try {
+      mediaStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: fps },
+        audio: false
+      });
+    } catch(e) {
+      setStatus("Screen capture cancelled or denied: " + e.message, "error");
+      return;
+    }
+
+    // Step 2: Attach stream to video element safely
+    setStatus("Attaching video stream...", "warn");
+    try {
+      await new Promise(function(resolve, reject) {
+        var settled = false;
+        function done() { if (!settled) { settled = true; resolve(); } }
+        function fail(e) { if (!settled) { settled = true; reject(e); } }
+
+        videoEl.onloadedmetadata = done;
+        videoEl.onerror = function() { fail(new Error("Video element error")); };
+
+        try {
+          videoEl.srcObject = mediaStream;
+        } catch(e) {
+          // Fallback for browsers that don't support srcObject assignment
+          try {
+            videoEl.src = URL.createObjectURL(mediaStream);
+            done();
+          } catch(e2) {
+            fail(new Error("Cannot attach stream: " + e2.message));
+          }
+        }
+
+        // Safety net — some browsers never fire onloadedmetadata for display streams
+        setTimeout(done, 2500);
+      });
+
+      try { await videoEl.play(); } catch(e) { console.warn("play():", e.message); }
+
+    } catch(e) {
+      setStatus("Stream attach failed: " + e.message, "error");
+      cleanup();
+      return;
+    }
+
+    // Step 3: Connect to Railway relay
+    setStatus("Connecting to relay server...", "warn");
+    var wsUrl = serverUrl + "?mode=broadcast&channel=" + encodeURIComponent(channelId);
+
+    try {
+      socket = new WebSocket(wsUrl);
+    } catch(e) {
+      setStatus("Invalid WebSocket URL: " + e.message, "error");
+      cleanup();
+      return;
+    }
+
+    socket.onopen = function() {
+      setStatus("✅ Connected! Broadcasting on channel: " + channelId);
+      document.getElementById("start-btn").style.display = "none";
+      document.getElementById("stop-btn").style.display = "block";
+      previewWrap.style.display = "block";
+      startCapture(fps);
+    };
+
+    socket.onmessage = function(e) {
+      try {
+        var msg = JSON.parse(e.data);
+        if (msg.type === "viewerCount") setViewerCount(msg.count);
+        if (msg.type === "status") setStatus("Server: " + msg.message);
+      } catch(ex) {}
+    };
+
+    socket.onclose = function() {
+      setStatus("Disconnected from relay.", "warn");
+      cleanup();
+      document.getElementById("start-btn").style.display = "block";
+      document.getElementById("stop-btn").style.display = "none";
+      previewWrap.style.display = "none";
+    };
+
+    socket.onerror = function() {
+      setStatus("WebSocket error — check your server URL.", "error");
+    };
+
+    mediaStream.getVideoTracks()[0].onended = function() {
+      setStatus("Screen share ended by browser.", "warn");
+      stopBroadcast();
+    };
+  }
+
+  function startCapture(fps) {
+    var INTERVAL = 1000 / fps;
+    var sending = false;
+
+    captureInterval = setInterval(function() {
+      if (sending) return;
+      if (!socket || socket.readyState !== 1) return;
+      if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+
+      sending = true;
+
+      var w = Math.min(videoEl.videoWidth, 640);
+      var h = Math.round(videoEl.videoHeight * (w / videoEl.videoWidth));
+      canvas.width  = w;
+      canvas.height = h;
+
+      try {
+        ctx.drawImage(videoEl, 0, 0, w, h);
+      } catch(e) {
+        sending = false;
+        return;
+      }
+
+      preview.src = canvas.toDataURL("image/jpeg", 0.7);
+
+      canvas.toBlob(function(blob) {
+        if (!blob) { sending = false; return; }
+        var reader = new FileReader();
+        reader.onloadend = function() {
+          if (socket && socket.readyState === 1) {
+            try {
+              socket.send(JSON.stringify({ image: reader.result }));
+            } catch(e) {
+              setStatus("Send error: " + e.message, "error");
+            }
+          }
+          sending = false;
+        };
+        reader.onerror = function() { sending = false; };
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.6);
+
+    }, INTERVAL);
+  }
+
+  function stopBroadcast() {
+    cleanup();
+    setStatus("Broadcast stopped.");
+    document.getElementById("start-btn").style.display = "block";
+    document.getElementById("stop-btn").style.display  = "none";
+    previewWrap.style.display = "none";
+  }
+
+  function cleanup() {
+    if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
+    if (socket) { try { socket.close(); } catch(e) {} socket = null; }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(function(t) { t.stop(); });
+      mediaStream = null;
+    }
+    try { videoEl.srcObject = null; } catch(e) {}
+    try { videoEl.src = ""; } catch(e) {}
+  }
+</script>
+
+</body>
+</html>
