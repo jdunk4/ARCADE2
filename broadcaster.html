@@ -44,8 +44,18 @@
     position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7);
     color: #FFD700; font-size: 12px; padding: 4px 10px; border-radius: 20px;
   }
+  #audio-indicator {
+    position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7);
+    color: #aaffaa; font-size: 11px; padding: 4px 10px; border-radius: 20px;
+    display: none;
+  }
   canvas { display: none; }
   .hint { font-size: 11px; color: #555; text-align: center; max-width: 600px; line-height: 1.6; }
+  .audio-note {
+    font-size: 11px; color: #ffcc44; text-align: center; max-width: 600px;
+    line-height: 1.6; background: #1a1500; border: 1px solid #443300;
+    border-radius: 8px; padding: 10px 14px;
+  }
 </style>
 </head>
 <body>
@@ -78,19 +88,31 @@
 <div id="preview-wrap">
   <img id="preview" alt="Live preview">
   <div id="viewer-count">0 viewers</div>
+  <div id="audio-indicator">🔊 Audio streaming</div>
 </div>
 
 <canvas id="capture-canvas"></canvas>
 
 <p class="hint">
   When you click Start, your browser will ask you to pick a window or screen to share.<br>
-  Select your SNES9x window. Frames will stream to your OtherSide world in real time.
+  Select your SNES9x window. Check <strong>"Share system audio"</strong> if prompted.
+</p>
+
+<p class="audio-note">
+  🎧 For audio: Install VB-Audio Virtual Cable, set SNES9x output to CABLE Input,<br>
+  enable "Listen to this device" in Windows Sound settings → your headphones.<br>
+  Then Chrome will capture both video and audio from SNES9x.
 </p>
 
 <script>
-  var socket = null;
-  var mediaStream = null;
+  var socket        = null;
+  var mediaStream   = null;
   var captureInterval = null;
+  var audioContext  = null;
+  var audioProcessor = null;
+  var audioSource   = null;
+  var audioInterval = null;
+  var hasAudio      = false;
 
   var videoEl = document.createElement("video");
   videoEl.autoplay = true;
@@ -98,82 +120,78 @@
   videoEl.playsInline = true;
 
   var canvas = document.getElementById("capture-canvas");
-  var ctx = canvas.getContext("2d");
-  var preview = document.getElementById("preview");
-  var previewWrap = document.getElementById("preview-wrap");
-  var statusEl = document.getElementById("status");
-  var viewerCountEl = document.getElementById("viewer-count");
+  var ctx    = canvas.getContext("2d");
 
   function setStatus(msg, type) {
-    statusEl.textContent = msg;
-    statusEl.className = type || "";
+    var el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = type || "";
   }
 
   function setViewerCount(n) {
-    viewerCountEl.textContent = n + " viewer" + (n !== 1 ? "s" : "");
+    document.getElementById("viewer-count").textContent =
+      n + " viewer" + (n !== 1 ? "s" : "");
   }
 
   async function startBroadcast() {
     var serverUrl = document.getElementById("server-url").value.trim();
     var channelId = document.getElementById("channel-id").value.trim();
-    var fps = parseInt(document.getElementById("fps").value) || 20;
+    var fps       = parseInt(document.getElementById("fps").value) || 20;
 
     if (!serverUrl || !channelId) {
       setStatus("Please fill in server URL and channel ID.", "error");
       return;
     }
 
-    // Step 1: Request screen capture
+    // ── Step 1: Request screen + audio capture ──────────────────
     setStatus("Requesting screen capture permission...", "warn");
     try {
       mediaStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: fps },
-        audio: false
+        audio: true  // Request audio — works if VB-Audio is set up
       });
     } catch(e) {
       setStatus("Screen capture cancelled or denied: " + e.message, "error");
       return;
     }
 
-    // Step 2: Attach stream to video element safely
+    // Check if audio track was captured
+    var audioTracks = mediaStream.getAudioTracks();
+    hasAudio = audioTracks.length > 0;
+    if (hasAudio) {
+      console.log("[broadcaster] audio track captured:", audioTracks[0].label);
+      document.getElementById("audio-indicator").style.display = "block";
+    } else {
+      console.log("[broadcaster] no audio track — video only");
+    }
+
+    // ── Step 2: Attach video stream ─────────────────────────────
     setStatus("Attaching video stream...", "warn");
     try {
       await new Promise(function(resolve, reject) {
         var settled = false;
         function done() { if (!settled) { settled = true; resolve(); } }
         function fail(e) { if (!settled) { settled = true; reject(e); } }
-
         videoEl.onloadedmetadata = done;
         videoEl.onerror = function() { fail(new Error("Video element error")); };
-
         try {
           videoEl.srcObject = mediaStream;
         } catch(e) {
-          // Fallback for browsers that don't support srcObject assignment
-          try {
-            videoEl.src = URL.createObjectURL(mediaStream);
-            done();
-          } catch(e2) {
-            fail(new Error("Cannot attach stream: " + e2.message));
-          }
+          try { videoEl.src = URL.createObjectURL(mediaStream); done(); }
+          catch(e2) { fail(new Error("Cannot attach stream: " + e2.message)); }
         }
-
-        // Safety net — some browsers never fire onloadedmetadata for display streams
         setTimeout(done, 2500);
       });
-
       try { await videoEl.play(); } catch(e) { console.warn("play():", e.message); }
-
     } catch(e) {
       setStatus("Stream attach failed: " + e.message, "error");
       cleanup();
       return;
     }
 
-    // Step 3: Connect to Railway relay
+    // ── Step 3: Connect WebSocket to Railway relay ──────────────
     setStatus("Connecting to relay server...", "warn");
     var wsUrl = serverUrl + "?mode=broadcast&channel=" + encodeURIComponent(channelId);
-
     try {
       socket = new WebSocket(wsUrl);
     } catch(e) {
@@ -183,11 +201,13 @@
     }
 
     socket.onopen = function() {
-      setStatus("✅ Connected! Broadcasting on channel: " + channelId);
+      setStatus("✅ Connected! Broadcasting on channel: " + channelId +
+        (hasAudio ? " (video + audio)" : " (video only)"));
       document.getElementById("start-btn").style.display = "none";
       document.getElementById("stop-btn").style.display = "block";
-      previewWrap.style.display = "block";
-      startCapture(fps);
+      document.getElementById("preview-wrap").style.display = "block";
+      startVideoCapture(fps);
+      if (hasAudio) startAudioCapture();
     };
 
     socket.onmessage = function(e) {
@@ -203,7 +223,7 @@
       cleanup();
       document.getElementById("start-btn").style.display = "block";
       document.getElementById("stop-btn").style.display = "none";
-      previewWrap.style.display = "none";
+      document.getElementById("preview-wrap").style.display = "none";
     };
 
     socket.onerror = function() {
@@ -216,9 +236,10 @@
     };
   }
 
-  function startCapture(fps) {
+  function startVideoCapture(fps) {
     var INTERVAL = 1000 / fps;
-    var sending = false;
+    var sending  = false;
+    var preview  = document.getElementById("preview");
 
     captureInterval = setInterval(function() {
       if (sending) return;
@@ -232,12 +253,8 @@
       canvas.width  = w;
       canvas.height = h;
 
-      try {
-        ctx.drawImage(videoEl, 0, 0, w, h);
-      } catch(e) {
-        sending = false;
-        return;
-      }
+      try { ctx.drawImage(videoEl, 0, 0, w, h); }
+      catch(e) { sending = false; return; }
 
       preview.src = canvas.toDataURL("image/jpeg", 0.7);
 
@@ -248,9 +265,7 @@
           if (socket && socket.readyState === 1) {
             try {
               socket.send(JSON.stringify({ image: reader.result }));
-            } catch(e) {
-              setStatus("Send error: " + e.message, "error");
-            }
+            } catch(e) { setStatus("Send error: " + e.message, "error"); }
           }
           sending = false;
         };
@@ -261,23 +276,79 @@
     }, INTERVAL);
   }
 
+  function startAudioCapture() {
+    try {
+      // Create audio context from the captured stream
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioSource  = audioContext.createMediaStreamSource(mediaStream);
+
+      // Use ScriptProcessor to capture raw PCM and encode as base64
+      var bufferSize = 4096;
+      audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+
+      audioSource.connect(audioProcessor);
+      audioProcessor.connect(audioContext.destination);
+
+      audioProcessor.onaudioprocess = function(e) {
+        if (!socket || socket.readyState !== 1) return;
+
+        var inputData = e.inputBuffer.getChannelData(0);
+        var pcm16     = new Int16Array(inputData.length);
+
+        // Convert Float32 PCM to Int16
+        for (var i = 0; i < inputData.length; i++) {
+          var s = Math.max(-1, Math.min(1, inputData[i]));
+          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+
+        // Send as base64
+        var bytes  = new Uint8Array(pcm16.buffer);
+        var binary = "";
+        for (var j = 0; j < bytes.byteLength; j++) {
+          binary += String.fromCharCode(bytes[j]);
+        }
+        var base64 = btoa(binary);
+
+        try {
+          socket.send(JSON.stringify({
+            type:       "audio",
+            data:       base64,
+            sampleRate: audioContext.sampleRate,
+            channels:   1
+          }));
+        } catch(err) {}
+      };
+
+      console.log("[broadcaster] audio capture started, sampleRate:", audioContext.sampleRate);
+    } catch(e) {
+      console.warn("[broadcaster] audio capture failed:", e.message);
+      hasAudio = false;
+      document.getElementById("audio-indicator").style.display = "none";
+    }
+  }
+
   function stopBroadcast() {
     cleanup();
     setStatus("Broadcast stopped.");
     document.getElementById("start-btn").style.display = "block";
     document.getElementById("stop-btn").style.display  = "none";
-    previewWrap.style.display = "none";
+    document.getElementById("preview-wrap").style.display = "none";
   }
 
   function cleanup() {
     if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
-    if (socket) { try { socket.close(); } catch(e) {} socket = null; }
+    if (audioProcessor)  { try { audioProcessor.disconnect(); } catch(e) {} audioProcessor = null; }
+    if (audioSource)     { try { audioSource.disconnect(); } catch(e) {} audioSource = null; }
+    if (audioContext)    { try { audioContext.close(); } catch(e) {} audioContext = null; }
+    if (socket)          { try { socket.close(); } catch(e) {} socket = null; }
     if (mediaStream) {
       mediaStream.getTracks().forEach(function(t) { t.stop(); });
       mediaStream = null;
     }
     try { videoEl.srcObject = null; } catch(e) {}
     try { videoEl.src = ""; } catch(e) {}
+    hasAudio = false;
+    document.getElementById("audio-indicator").style.display = "none";
   }
 </script>
 
