@@ -105,9 +105,33 @@ const sessions = new Map();
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // BROADCAST RELAY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const broadcastViewers = new Map();  // channelId → Set<ws>
-const broadcastSenders = new Map();  // channelId → ws
-const broadcastLastFrame = new Map(); // channelId → last frame data string ← NEW
+const broadcastViewers   = new Map();  // channelId → Set<ws>
+const broadcastSenders   = new Map();  // channelId → ws
+const broadcastLastFrame = new Map();  // channelId → last frame data string
+// Per-viewer pending frame — only latest frame queued per viewer
+// When a new frame arrives before viewer sent previous, skip the old one
+const viewerPendingFrame = new Map();  // ws → dataStr | null
+const viewerSending      = new Map();  // ws → bool
+
+// Send the pending frame to a viewer, then immediately check for next
+// This ensures we always send the LATEST frame, never a stale queued one
+function sendNextFrame(viewerWs) {
+  var frame = viewerPendingFrame.get(viewerWs);
+  if (!frame || viewerWs.readyState !== 1) {
+    viewerSending.set(viewerWs, false);
+    return;
+  }
+  viewerPendingFrame.set(viewerWs, null); // clear pending
+  viewerSending.set(viewerWs, true);
+  try {
+    viewerWs.send(frame, function() {
+      // After send completes, check if a newer frame arrived while we were sending
+      sendNextFrame(viewerWs);
+    });
+  } catch(e) {
+    viewerSending.set(viewerWs, false);
+  }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // WINE SESSION
@@ -359,12 +383,17 @@ wss.on("connection", async function(ws, req) {
         }
       } catch(e) {}
 
-      // Forward to all current viewers as string
+      // Forward LATEST frame only to each viewer — skip queued frames
+      // This prevents frame buildup lag when viewer is slower than broadcaster
       var viewers = broadcastViewers.get(channelId);
       if (!viewers || viewers.size === 0) return;
       viewers.forEach(function(viewerWs) {
-        if (viewerWs.readyState === 1) {
-          try { viewerWs.send(dataStr); } catch(e) {}
+        if (viewerWs.readyState !== 1) return;
+        // Always overwrite pending with latest frame
+        viewerPendingFrame.set(viewerWs, dataStr);
+        // If not already sending, send now
+        if (!viewerSending.get(viewerWs)) {
+          sendNextFrame(viewerWs);
         }
       });
     });
@@ -417,6 +446,9 @@ wss.on("connection", async function(ws, req) {
           try { bc.send(JSON.stringify({ type: "viewerCount", count: viewers.size })); } catch(e) {}
         }
       }
+      // Clean up per-viewer state
+      viewerPendingFrame.delete(ws);
+      viewerSending.delete(ws);
       console.log("[view] viewer disconnected from channel: " + channelId);
     });
 
