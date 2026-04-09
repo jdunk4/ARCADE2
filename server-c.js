@@ -87,38 +87,6 @@ app.get("/last-frame/:channelId", serveFrame);
 app.get("/frame-a/:channelId", serveFrame);
 app.get("/frame-b/:channelId", serveFrame);
 
-// ── Live audio stream endpoint ────────────────────────────────────────────────
-// Broadcaster sends WebM/Opus chunks via WebSocket.
-// This endpoint pipes them as a continuous HTTP chunked stream.
-// m-video src="https://.../ audio-stream/snes-live" plays it natively in Unreal.
-var audioStreamListeners = new Map(); // channelId -> Set<res>
-var audioStreamHeaders   = new Map(); // channelId -> first WebM header chunk
-
-app.get("/audio-stream/:channelId", function(req, res) {
-  var channelId = req.params.channelId;
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Content-Type", "audio/webm; codecs=opus");
-  res.setHeader("Transfer-Encoding", "chunked");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering on Railway
-
-  // Send cached header chunk so the stream is valid WebM from the start
-  var header = audioStreamHeaders.get(channelId);
-  if (header) {
-    try { res.write(header); } catch(e) {}
-  }
-
-  if (!audioStreamListeners.has(channelId)) audioStreamListeners.set(channelId, new Set());
-  audioStreamListeners.get(channelId).add(res);
-  console.log("[audio-stream] listener connected on channel: " + channelId);
-
-  req.on("close", function() {
-    var listeners = audioStreamListeners.get(channelId);
-    if (listeners) listeners.delete(res);
-    console.log("[audio-stream] listener disconnected from channel: " + channelId);
-  });
-});
 
 const KEY_MAP = {
   up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight",
@@ -379,37 +347,19 @@ wss.on("connection", async function(ws, req) {
     console.log("[broadcast] broadcaster connected on channel: " + channelId);
 
     ws.on("message", function(data) {
-      // Always convert to string for JSON viewers
+      // Always convert to string — broadcaster sends Buffer (binary)
+      // but viewers need UTF-8 text for JSON.parse to work
       var dataStr = data.toString();
 
+      // Cache the last frame so new viewers get it immediately on connect
       try {
         var parsed = JSON.parse(dataStr);
-
-        // Cache last video frame for new viewers
         if (parsed.image) {
           broadcastLastFrame.set(channelId, dataStr);
         }
-
-        // Pipe audio chunks to HTTP stream listeners
-        if (parsed.type === "audio" && parsed.data) {
-          var listeners = audioStreamListeners.get(channelId);
-          if (listeners && listeners.size > 0) {
-            // Decode base64 back to binary and pipe as raw WebM bytes
-            try {
-              var binary = Buffer.from(parsed.data, "base64");
-              // Cache first chunk as WebM header for new listeners
-              if (!audioStreamHeaders.has(channelId)) {
-                audioStreamHeaders.set(channelId, binary);
-              }
-              listeners.forEach(function(res) {
-                try { res.write(binary); } catch(e) { listeners.delete(res); }
-              });
-            } catch(e) {}
-          }
-        }
       } catch(e) {}
 
-      // Forward to all WebSocket viewers
+      // Forward to all current viewers as string
       var viewers = broadcastViewers.get(channelId);
       if (!viewers || viewers.size === 0) return;
       viewers.forEach(function(viewerWs) {
