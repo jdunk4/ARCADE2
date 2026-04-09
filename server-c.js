@@ -4,7 +4,7 @@ const { WebSocketServer } = require("ws");
 const puppeteer = require("puppeteer");
 const { spawn } = require("child_process");
 const fs = require("fs");
- 
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -60,8 +60,11 @@ app.get("/mml-screen.html", function(req, res) {
   res.sendFile("/app/mml-screen.html");
 });
 
-// Serve last broadcast frame as JPEG for fallback polling
+// Serve last broadcast frame as JPEG for polling
+// CORS headers allow mmleditor.com and OtherSide to fetch this
 app.get("/last-frame/:channelId", function(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET");
   var channelId = req.params.channelId;
   var lastFrame = broadcastLastFrame.get(channelId);
   if (!lastFrame) return res.status(404).send("No frame yet");
@@ -70,7 +73,8 @@ app.get("/last-frame/:channelId", function(req, res) {
     var base64 = parsed.image.replace("data:image/jpeg;base64,", "");
     var buf = Buffer.from(base64, "base64");
     res.setHeader("Content-Type", "image/jpeg");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
     res.send(buf);
   } catch(e) { res.status(500).send("Error: " + e.message); }
 });
